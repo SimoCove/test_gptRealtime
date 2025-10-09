@@ -5,5 +5,4 @@ Next, run the command:
 npm install
 
 To run the application, run the command:  
-npm start  
-After, open localhost:3001.
+npm start
