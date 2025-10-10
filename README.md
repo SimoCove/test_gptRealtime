@@ -1,8 +1,26 @@
-First, create a .env file and insert the following line:  
-OPENAI_API_KEY=your_api_key
+# Description
 
-Next, run the command:  
+The application allows you to interact with **gpt-realtime** by voice.  
+Responses are always transcribed into text format.  
+You can enable or disable GPT’s voice responses by speaking the specified *wake word* or *sleep word*.  
+The model can also answer questions about the loaded drawing.
+
+# Preparation
+
+1. Create a .env file and insert the following line in it:
+
+```dotenv
+OPENAI_API_KEY=your_OpenAI_api_key
+```
+
+2. Install dependencies
+
+```bash
 npm install
+```
 
-To run the application, run the command:  
+# Execution
+
+```bash
 npm start
+```
