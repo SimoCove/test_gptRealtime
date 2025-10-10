@@ -10,7 +10,7 @@ The model can also answer questions about the loaded drawing.
 1. Create a .env file and insert the following line in it:
 
 ```dotenv
-OPENAI_API_KEY=your_OpenAI_api_key
+VITE_OPENAI_API_KEY=your_OpenAI_api_key
 ```
 
 2. Install dependencies
