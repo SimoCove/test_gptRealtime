@@ -54,7 +54,16 @@ body {
     color: red;
 }
 
-#sessionState {
+.stateDisabled {
+    color: #adb5bd;
+}
+
+.stateEnabled {
+    color: #6c757d;
+}
+
+#sessionState,
+#audioState {
     font-weight: bold;
 }
 

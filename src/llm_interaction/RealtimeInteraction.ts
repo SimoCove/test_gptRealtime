@@ -10,6 +10,7 @@ interface UIElements {
     startBtn: HTMLButtonElement;
     stopBtn: HTMLButtonElement;
     sessionState: HTMLElement;
+    audioState: HTMLElement;
     modelResponse: HTMLElement;
 }
 
@@ -25,6 +26,8 @@ export class RealtimeInteraction {
     private ephemeralKey: string | null = null;
 
     private elements: UIElements | null = null;
+
+    private flagAudioDisFeedback: boolean = false;
 
     private constructor() { }
 
@@ -49,6 +52,7 @@ export class RealtimeInteraction {
         this.elements.stopBtn.onclick = () => this.stopSession();
 
         this.handleSessionState(false);
+        this.handleAudioState(false);
     }
 
     private initializeUIElements(): void {
@@ -56,6 +60,7 @@ export class RealtimeInteraction {
             startBtn: document.getElementById("startBtn") as HTMLButtonElement,
             stopBtn: document.getElementById("stopBtn") as HTMLButtonElement,
             sessionState: document.getElementById("sessionState") as HTMLElement,
+            audioState: document.getElementById("audioState") as HTMLElement,
             modelResponse: document.getElementById("modelResponse") as HTMLElement
         }
     }
@@ -81,6 +86,24 @@ export class RealtimeInteraction {
             this.elements.sessionState.classList.remove("stateOn");
             this.elements.startBtn.disabled = false;
             this.elements.stopBtn.disabled = true;
+        }
+    }
+
+    private handleAudioState(state: boolean): void {
+        if (!this.elements) {
+            console.error("UI elements not initialized");
+            return;
+        }
+
+        if (state) {
+            this.elements.audioState.textContent = "Audio on";
+            this.elements.audioState.classList.remove("stateDisabled");
+            this.elements.audioState.classList.add("stateEnabled");
+
+        } else {
+            this.elements.audioState.textContent = "Audio off";
+            this.elements.audioState.classList.add("stateDisabled");
+            this.elements.audioState.classList.remove("stateEnabled");
         }
     }
 
@@ -139,6 +162,7 @@ export class RealtimeInteraction {
         this.sessionReady = false;
         console.log("Session closed");
         this.handleSessionState(false);
+        this.handleAudioState(false);
     }
 
     private setupPeerConnection(): boolean {
@@ -232,6 +256,7 @@ export class RealtimeInteraction {
 
         this.dataChannel.onerror = (e: Event) => {
             console.error("[DataChannel] Error", e);
+            console.error("Data not sent: buffered amount:", this.dataChannel?.bufferedAmount + " bytes"); // data not sent
             if (e instanceof RTCErrorEvent) {
                 alert("[DataChannel] Error " + e.error.message);
             } else {
@@ -262,14 +287,6 @@ export class RealtimeInteraction {
                     break;
 
                 // errors
-                case "response.done":
-                    if (msg.response?.status === "failed") {
-                        const error = msg.response.status_details?.error;
-                        if (error) this.logStatus("DataChannel", "error", error.message);
-                        this.stopSession();
-                    }
-                    break;
-
                 case "invalid_request_error":
                     if (msg.error) this.logStatus("DataChannel", "error", msg.error);
                     this.stopSession();
@@ -300,6 +317,22 @@ export class RealtimeInteraction {
 
                 case "response.output_audio_transcript.done":
                     console.log("Response: " + msg.transcript);
+                    break;
+
+                case "output_audio_buffer.stopped":
+                    if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
+                    break;
+                
+                case "output_audio_buffer.cleared":
+                    if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
+                    break;
+
+                case "response.done":
+                    if (msg.response?.status === "failed") {
+                        const error = msg.response.status_details?.error;
+                        if (error) this.logStatus("DataChannel", "error", error.message);
+                        this.stopSession();
+                    }
                     break;
 
                 case "response.function_call_arguments.done": // a function was called
@@ -379,7 +412,7 @@ export class RealtimeInteraction {
 
     private async getFileData(): Promise<string> {
         try {
-            const path = "/Car/data.json";
+            const path = "/House_with_rainbow/data.json";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             return await response.json();
@@ -392,7 +425,7 @@ export class RealtimeInteraction {
 
     private async getFileTemplate(): Promise<string> {
         try {
-            const path = "/Car/template.png";
+            const path = "/House_with_rainbow/template.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -412,7 +445,7 @@ export class RealtimeInteraction {
 
     private async getFileColorMap(): Promise<string> {
         try {
-            const path = "/Car/colorMap.png";
+            const path = "/House_with_rainbow/colorMap.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -529,6 +562,12 @@ export class RealtimeInteraction {
         this.dataChannel.send(JSON.stringify(dataRes));
         console.warn("data.json file sent to the model");
 
+        this.dataChannel.send(JSON.stringify(templateRes));
+        console.warn("image template file sent to the model");
+
+        this.dataChannel.send(JSON.stringify(colorMapRes));
+        console.warn("image color map file sent to the model");
+/*
         if (this.checkBase64Size(templateOutput)) {
             this.dataChannel.send(JSON.stringify(templateRes));
             console.warn("image template file sent to the model");
@@ -537,7 +576,7 @@ export class RealtimeInteraction {
         if (this.checkBase64Size(colorMapOutput)) {
             this.dataChannel.send(JSON.stringify(colorMapRes));
             console.warn("image color map file sent to the model");
-        } else console.error("Error: the color map image is too large to be sent");
+        } else console.error("Error: the color map image is too large to be sent");*/
     }
 
     private handleFunctionCalls(msg: RealtimeMessage): void {
@@ -573,14 +612,29 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(functionRes));
+        this.handleAudioState(true);
         this.dataChannel.send(JSON.stringify({ type: "response.create" }));
     }
 
-    private disableAudio(): void {
+    private async disableAudio(): Promise<void> {
         console.warn("Called function disableAudio()");
         if (!this.dataChannel) {
             this.stopSession();
             return;
+        }
+
+        const audioDisFeedback = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "user",
+                content: [
+                    {
+                        type: "input_text",
+                        text: "Translate the phrase “Audio disabled” into the language you were using. Speak the translation exactly as written, without adding or removing any words.",
+                    }
+                ]
+            }
         }
 
         const functionRes = {
@@ -591,6 +645,23 @@ export class RealtimeInteraction {
             }
         }
 
+        this.flagAudioDisFeedback = true;
+        this.dataChannel.send(JSON.stringify(audioDisFeedback));
+        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
+        await this.waitForResponse();
+
         this.dataChannel.send(JSON.stringify(functionRes));
+        this.handleAudioState(false);
+    }
+
+    private async waitForResponse(): Promise<void> {
+        return new Promise(resolve => {
+            const check = setInterval(() => {
+                if (!this.flagAudioDisFeedback) {
+                    clearInterval(check);
+                    resolve();
+                }
+            }, 50);
+        });
     }
 }
