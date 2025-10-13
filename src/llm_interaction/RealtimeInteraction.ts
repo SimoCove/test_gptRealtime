@@ -256,7 +256,6 @@ export class RealtimeInteraction {
 
         this.dataChannel.onerror = (e: Event) => {
             console.error("[DataChannel] Error", e);
-            console.error("Data not sent: buffered amount:", this.dataChannel?.bufferedAmount + " bytes"); // data not sent
             if (e instanceof RTCErrorEvent) {
                 alert("[DataChannel] Error " + e.error.message);
             } else {
@@ -412,7 +411,7 @@ export class RealtimeInteraction {
 
     private async getFileData(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/data.json";
+            const path = "/Car/data.json";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             return await response.json();
@@ -425,7 +424,7 @@ export class RealtimeInteraction {
 
     private async getFileTemplate(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/template.png";
+            const path = "/Car/template.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -445,7 +444,7 @@ export class RealtimeInteraction {
 
     private async getFileColorMap(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/colorMap.png";
+            const path = "/Car/colorMap.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -499,7 +498,8 @@ export class RealtimeInteraction {
                         text: `
                             TACTILE DRAWING DATA:
                             The following JSON contains the tactile drawing data.
-                            Store it in memory and use it to answer future questions. 
+                            Store it in memory and use it to answer future questions.
+                            Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
                             The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot with the colorMap.
                             If you are asked for the color of the hotspot, do not respond with the one indicated in the "color" field of the json file, but with what is indicated in the hotspot description (if present, otherwise respond saying that you don't have this information).
                             `
@@ -524,6 +524,7 @@ export class RealtimeInteraction {
                             TACTILE DRAWING TEMPLATE IMAGE:
                             The following image is the tactile drawing itself.
                             Store it in memory and use it to answer future questions.
+                            Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
                             `
                     },
                     {
@@ -547,6 +548,7 @@ export class RealtimeInteraction {
                             The following image represents the color map of the tactile drawing.
                             Each color corresponds to a hotspot, indicating its location in the drawing.
                             Store it in memory and use it to answer questions about hotspot positions.
+                            Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
                             Do not confuse it with the tactile drawing image.
                             The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot.
                             `
