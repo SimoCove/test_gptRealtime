@@ -1,4 +1,15 @@
 import sessionConfig from "./sessionConfig";
+import {
+    imageToBase64,
+    base64ToBlob,
+    getBlobSizeFromBase64,
+    checkBase64Size,
+    toWebp,
+    compressWebpBlob,
+    showBlobImage,
+    blobSizeInKB,
+    checkBlobSize
+} from '../utils/utils';
 
 type RealtimeMessage = {
     type: string;
@@ -321,7 +332,7 @@ export class RealtimeInteraction {
                 case "output_audio_buffer.stopped":
                     if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
                     break;
-                
+
                 case "output_audio_buffer.cleared":
                     if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
                     break;
@@ -411,7 +422,7 @@ export class RealtimeInteraction {
 
     private async getFileData(): Promise<string> {
         try {
-            const path = "/Car/data.json";
+            const path = "/House_with_rainbow/data.json";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             return await response.json();
@@ -424,17 +435,11 @@ export class RealtimeInteraction {
 
     private async getFileTemplate(): Promise<string> {
         try {
-            const path = "/Car/template.png";
+            const path = "/House_with_rainbow/template.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
-
-            return await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
+            return await imageToBase64(blob);
 
         } catch (err) {
             console.error(err);
@@ -444,36 +449,16 @@ export class RealtimeInteraction {
 
     private async getFileColorMap(): Promise<string> {
         try {
-            const path = "/Car/colorMap.png";
+            const path = "/House_with_rainbow/colorMap.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
-
-            return await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
+            return await imageToBase64(blob);
 
         } catch (err) {
             console.error(err);
             return "Error retrieving file colorMap.";
         }
-    }
-
-    private getBase64Size(base64String: string): number {
-        const bytes = Math.ceil((base64String.length * 3) / 4);
-        const kb = bytes / 1024;
-        return kb;
-    }
-
-    private checkBase64Size(base64String: string): boolean {
-        const max_size = 220; // kb
-        const stringSize = this.getBase64Size(base64String);
-
-        if (stringSize > max_size) return false;
-        else return true;
     }
 
     // send the content from the .camio file to the model
@@ -487,7 +472,18 @@ export class RealtimeInteraction {
         const templateOutput = await this.getFileTemplate(); // base64 string
         const colorMapOutput = await this.getFileColorMap(); // base64 string
 
-        const dataRes = {
+        this.sendData(dataOutput);
+        await this.sendImage(templateOutput, "template");
+        await this.sendImage(colorMapOutput, "colorMap");
+    }
+
+    private sendData(data: string): void {
+        if (!this.dataChannel) {
+            this.stopSession();
+            return;
+        }
+
+        const res = {
             type: "conversation.item.create",
             item: {
                 type: "message",
@@ -506,79 +502,99 @@ export class RealtimeInteraction {
                     },
                     {
                         type: "input_text",
-                        text: dataOutput
+                        text: data
                     }
                 ]
             }
         }
 
-        const templateRes = {
-            type: "conversation.item.create",
-            item: {
-                type: "message",
-                role: "user",
-                content: [
-                    {
-                        type: "input_text",
-                        text: `
-                            TACTILE DRAWING TEMPLATE IMAGE:
-                            The following image is the tactile drawing itself.
-                            Store it in memory and use it to answer future questions.
-                            Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
-                            `
-                    },
-                    {
-                        type: "input_image",
-                        image_url: templateOutput
-                    }
-                ]
-            }
-        }
-
-        const colorMapRes = {
-            type: "conversation.item.create",
-            item: {
-                type: "message",
-                role: "user",
-                content: [
-                    {
-                        type: "input_text",
-                        text: `
-                            TACTILE DRAWING COLOR MAP IMAGE:
-                            The following image represents the color map of the tactile drawing.
-                            Each color corresponds to a hotspot, indicating its location in the drawing.
-                            Store it in memory and use it to answer questions about hotspot positions.
-                            Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
-                            Do not confuse it with the tactile drawing image.
-                            The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot.
-                            `
-                    },
-                    {
-                        type: "input_image",
-                        image_url: colorMapOutput
-                    }
-                ]
-            }
-        }
-
-        this.dataChannel.send(JSON.stringify(dataRes));
+        this.dataChannel.send(JSON.stringify(res));
         console.warn("data.json file sent to the model");
+    }
 
-        this.dataChannel.send(JSON.stringify(templateRes));
-        console.warn("image template file sent to the model");
+    private async sendImage(initialBase64Image: string, type: string): Promise<void> {
+        if (!this.dataChannel) {
+            this.stopSession();
+            return;
+        }
 
-        this.dataChannel.send(JSON.stringify(colorMapRes));
-        console.warn("image color map file sent to the model");
-/*
-        if (this.checkBase64Size(templateOutput)) {
-            this.dataChannel.send(JSON.stringify(templateRes));
-            console.warn("image template file sent to the model");
-        } else console.error("Error: the template image is too large to be sent");
+        let textMsg: string = "";
 
-        if (this.checkBase64Size(colorMapOutput)) {
-            this.dataChannel.send(JSON.stringify(colorMapRes));
-            console.warn("image color map file sent to the model");
-        } else console.error("Error: the color map image is too large to be sent");*/
+        if (type === "template") {
+            textMsg = `
+                    TACTILE DRAWING TEMPLATE IMAGE:
+                    The following image is the tactile drawing itself.
+                    Store it in memory and use it to answer future questions.
+                    Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
+                    `;
+
+        } else if (type === "colorMap") {
+            textMsg = `
+                    TACTILE DRAWING COLOR MAP IMAGE:
+                    The following image represents the color map of the tactile drawing.
+                    Each color corresponds to a hotspot, indicating its location in the drawing.
+                    Store it in memory and use it to answer questions about hotspot positions.
+                    Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
+                    Do not confuse it with the tactile drawing image.
+                    The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot.
+                    `;
+        }
+
+        //console.log("Initial blob " + type + " image size:", getBlobSizeFromBase64(initialBase64Image));
+        const finalBase64Image = await this.getSendableImage(initialBase64Image, type);
+        //console.log("Final blob " + type + " image size:", finalBase64Image ? getBlobSizeFromBase64(finalBase64Image) : "N/A");
+
+        //const finalBlob = finalBase64Image ? base64ToBlob(finalBase64Image) : null;
+        //if (finalBlob) showBlobImage(finalBlob);
+
+        const res = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "user",
+                content: [
+                    {
+                        type: "input_text",
+                        text: textMsg
+                    },
+                    {
+                        type: "input_image",
+                        image_url: finalBase64Image
+                    }
+                ]
+            }
+        }
+
+        if (finalBase64Image) {
+            this.dataChannel.send(JSON.stringify(res));
+            console.warn("Image " + type + " file sent to the model");
+        } else console.error("Error: the " + type + " image is too large to be sent");
+    }
+
+    private async getSendableImage(initialBase64Image: string, type: string): Promise<string | null> {
+        const maxImageSize: number = 220;
+
+        try {
+            const blob = base64ToBlob(initialBase64Image);
+            //showBlobImage(blob);
+            if (checkBlobSize(blob, maxImageSize)) return initialBase64Image; // send initial base64 image
+
+            const webpBlob = await toWebp(blob); // convert in webp image
+            if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp image
+
+            let quality = 0.9;
+            while (quality >= 0.0) {
+                const compressedBlob = await compressWebpBlob(webpBlob, quality);
+                if (checkBlobSize(compressedBlob, maxImageSize)) return await imageToBase64(compressedBlob);
+                quality -= 0.1;
+            }
+
+            return null;
+
+        } catch (err) {
+            console.error("Image compression error:", err);
+            return null;
+        }
     }
 
     private handleFunctionCalls(msg: RealtimeMessage): void {
