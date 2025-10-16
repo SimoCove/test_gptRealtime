@@ -2,13 +2,14 @@ import sessionConfig from "./sessionConfig";
 import {
     imageToBase64,
     base64ToBlob,
+    blobSizeInKB,
     getBlobSizeFromBase64,
+    showBlobTypeDimSize,
+    checkBlobSize,
     checkBase64Size,
     toWebp,
-    compressWebpBlob,
-    showBlobImage,
-    blobSizeInKB,
-    checkBlobSize
+    reduceResolution,
+    compressWebpBlob
 } from '../utils/utils';
 
 type RealtimeMessage = {
@@ -422,7 +423,7 @@ export class RealtimeInteraction {
 
     private async getFileData(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/data.json";
+            const path = "/Islet/data.json";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             return await response.json();
@@ -435,7 +436,7 @@ export class RealtimeInteraction {
 
     private async getFileTemplate(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/template.png";
+            const path = "/Islet/template.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -449,7 +450,7 @@ export class RealtimeInteraction {
 
     private async getFileColorMap(): Promise<string> {
         try {
-            const path = "/House_with_rainbow/colorMap.png";
+            const path = "/Islet/colorMap.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -540,12 +541,8 @@ export class RealtimeInteraction {
                     `;
         }
 
-        //console.log("Initial blob " + type + " image size:", getBlobSizeFromBase64(initialBase64Image));
         const finalBase64Image = await this.getSendableImage(initialBase64Image, type);
-        //console.log("Final blob " + type + " image size:", finalBase64Image ? getBlobSizeFromBase64(finalBase64Image) : "N/A");
-
-        //const finalBlob = finalBase64Image ? base64ToBlob(finalBase64Image) : null;
-        //if (finalBlob) showBlobImage(finalBlob);
+        //if (finalBase64Image) await showBlobTypeDimSize(base64ToBlob(finalBase64Image), type);
 
         const res = {
             type: "conversation.item.create",
@@ -576,16 +573,22 @@ export class RealtimeInteraction {
 
         try {
             const blob = base64ToBlob(initialBase64Image);
-            //showBlobImage(blob);
-            if (checkBlobSize(blob, maxImageSize)) return initialBase64Image; // send initial base64 image
+            //await showBlobTypeDimSize(blob, type);
+
+            const reducedDimBlob = await reduceResolution(blob); // reduce dimensions of the blob
+            //await showBlobTypeDimSize(reducedDimBlob, type);
+            if (checkBlobSize(reducedDimBlob, maxImageSize)) return await imageToBase64(reducedDimBlob); // send image with reduced dimensions
 
             const webpBlob = await toWebp(blob); // convert in webp image
-            if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp image
+            //await showBlobTypeDimSize(webpBlob, type);
+            if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp converted image
 
             let quality = 0.9;
             while (quality >= 0.0) {
                 const compressedBlob = await compressWebpBlob(webpBlob, quality);
-                if (checkBlobSize(compressedBlob, maxImageSize)) return await imageToBase64(compressedBlob);
+                //await showBlobTypeDimSize(compressedBlob, type);
+                if (checkBlobSize(compressedBlob, maxImageSize)) return await imageToBase64(compressedBlob); // send webp compressed image
+
                 quality -= 0.1;
             }
 

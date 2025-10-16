@@ -1,6 +1,6 @@
 import Compressor from "compressorjs"
 
-export async function imageToBase64(image: Blob | File): Promise<string> {
+export function imageToBase64(image: Blob | File): Promise<string> {
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -20,36 +20,45 @@ export function base64ToBlob(base64: string): Blob {
 }
 
 export function blobSizeInKB(blob: Blob): number {
-  return (blob.size / 1024);
+    return (blob.size / 1024);
+}
+
+export function getBlobSizeFromBase64(base64String: string): number {
+    const blob = base64ToBlob(base64String);
+    return blobSizeInKB(blob);
+}
+
+export function showBlobTypeDimSize(blob: Blob, imageType: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(blob);
+        const sizeKB = blobSizeInKB(blob);
+
+        img.onload = () => {
+            console.log(`[${imageType} image] Type: ${blob.type}, Dimensions: ${img.width}x${img.height}px, Size: ${sizeKB.toFixed(2)} KB`);
+            resolve();
+        };
+        img.onerror = (e) => reject(e);
+    });
 }
 
 export function checkBlobSize(blob: Blob, max_size: number = 200): boolean {
     const imageSize = blobSizeInKB(blob);
-    
-    if (imageSize > max_size) return false;
-    else return true;
-}
-
-export function getBlobSizeFromBase64(base64String: string): number {
-    const bytes = Math.ceil((base64String.length * 3) / 4);
-    const kb = bytes / 1024;
-    return kb;
+    return imageSize <= max_size;
 }
 
 export function checkBase64Size(base64String: string, max_size: number = 200): boolean {
     const imageSize = getBlobSizeFromBase64(base64String);
-
-    if (imageSize > max_size) return false;
-    else return true;
+    return imageSize <= max_size;
 }
 
 export async function toWebp(blob: Blob): Promise<Blob> {
     const img = new Image();
     img.src = URL.createObjectURL(blob);
 
-    await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
+    await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Unable to load image"));
     });
 
     const canvas = document.createElement('canvas');
@@ -60,13 +69,52 @@ export async function toWebp(blob: Blob): Promise<Blob> {
 
     // export as WebP
     return new Promise<Blob>((resolve) => {
-        canvas.toBlob((resBlob) => {
-            resolve(resBlob!);
-        }, 'image/webp');
+        canvas.toBlob(
+            (resBlob) => resolve(resBlob!),
+            'image/webp'
+        );
     });
 }
 
-export async function compressWebpBlob(blob: Blob, quality: number = 0.8): Promise<Blob> {
+export async function reduceResolution(blob: Blob, maxDimension: number = 600, format: 'image/webp' | 'image/jpeg' | 'image/png' = 'image/png'): Promise<Blob> {
+    const img = new Image();
+    img.src = URL.createObjectURL(blob);
+
+    await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Unable to load image"));
+    });
+
+    let width = img.width;
+    let height = img.height;
+
+    if (width > height) {
+        if (width > maxDimension) {
+            height = Math.round(height * (maxDimension / width));
+            width = maxDimension;
+        }
+    } else {
+        if (height > maxDimension) {
+            width = Math.round(width * (maxDimension / height));
+            height = maxDimension;
+        }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    return new Promise<Blob>((resolve) => {
+        canvas.toBlob(
+            (resBlob) => resolve(resBlob!),
+            format
+        );
+    });
+}
+
+export function compressWebpBlob(blob: Blob, quality: number = 0.8): Promise<Blob> {
     return new Promise((resolve, reject) => {
         new Compressor(blob, {
             quality: quality, // 0.0 (max compression) - 1.0
@@ -79,15 +127,4 @@ export async function compressWebpBlob(blob: Blob, quality: number = 0.8): Promi
             }
         });
     });
-}
-
-export async function showBlobImage(blob: Blob): Promise<void> {
-    const url = URL.createObjectURL(blob);
-
-    const img = document.createElement('img');
-    img.src = url;
-    img.style.maxWidth = '350px';
-    document.getElementById('imagesContainer')?.appendChild(img);
-
-    img.onload = () => URL.revokeObjectURL(url);
 }
