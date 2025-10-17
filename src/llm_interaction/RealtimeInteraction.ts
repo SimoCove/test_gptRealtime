@@ -2,11 +2,8 @@ import sessionConfig from "./sessionConfig";
 import {
     imageToBase64,
     base64ToBlob,
-    blobSizeInKB,
-    getBlobSizeFromBase64,
     showBlobTypeDimSize,
     checkBlobSize,
-    checkBase64Size,
     toWebp,
     reduceResolution,
     compressWebpBlob
@@ -55,10 +52,7 @@ export class RealtimeInteraction {
         this.ephemeralKey = ephemeralKey;
 
         this.initializeUIElements();
-        if (!this.elements) {
-            console.error("UI elements not initialized");
-            return;
-        }
+        if (!this.elements) return console.error("UI elements not initialized");
 
         this.elements.startBtn.onclick = () => this.startSession();
         this.elements.stopBtn.onclick = () => this.stopSession();
@@ -78,10 +72,7 @@ export class RealtimeInteraction {
     }
 
     private handleSessionState(state: boolean): void {
-        if (!this.elements) {
-            console.error("UI elements not initialized");
-            return;
-        }
+        if (!this.elements) return console.error("UI elements not initialized");
 
         if (state) {
             this.elements.sessionState.textContent = "Session on";
@@ -102,10 +93,7 @@ export class RealtimeInteraction {
     }
 
     private handleAudioState(state: boolean): void {
-        if (!this.elements) {
-            console.error("UI elements not initialized");
-            return;
-        }
+        if (!this.elements) return console.error("UI elements not initialized");
 
         if (state) {
             this.elements.audioState.textContent = "Audio on";
@@ -408,10 +396,7 @@ export class RealtimeInteraction {
 
     // send to the model the first, instructive message
     private initSession(): void {
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         const config = {
             type: "session.update",
@@ -464,10 +449,7 @@ export class RealtimeInteraction {
 
     // send the content from the .camio file to the model
     private async sendFileContent(): Promise<void> {
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         const dataOutput = JSON.stringify(await this.getFileData()); // json string
         const templateOutput = await this.getFileTemplate(); // base64 string
@@ -479,10 +461,7 @@ export class RealtimeInteraction {
     }
 
     private sendData(data: string): void {
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         const res = {
             type: "conversation.item.create",
@@ -497,8 +476,6 @@ export class RealtimeInteraction {
                             The following JSON contains the tactile drawing data.
                             Store it in memory and use it to answer future questions.
                             Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
-                            The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot with the colorMap.
-                            If you are asked for the color of the hotspot, do not respond with the one indicated in the "color" field of the json file, but with what is indicated in the hotspot description (if present, otherwise respond saying that you don't have this information).
                             `
                     },
                     {
@@ -514,30 +491,24 @@ export class RealtimeInteraction {
     }
 
     private async sendImage(initialBase64Image: string, type: string): Promise<void> {
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         let textMsg: string = "";
 
         if (type === "template") {
             textMsg = `
                     TACTILE DRAWING TEMPLATE IMAGE:
-                    The following image is the tactile drawing itself.
-                    Store it in memory and use it to answer future questions.
-                    Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
+                    - The following image is the tactile drawing itself.
+                    - Store it in memory and use it to answer future questions.
+                    - Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
                     `;
 
         } else if (type === "colorMap") {
             textMsg = `
                     TACTILE DRAWING COLOR MAP IMAGE:
-                    The following image represents the color map of the tactile drawing.
-                    Each color corresponds to a hotspot, indicating its location in the drawing.
-                    Store it in memory and use it to answer questions about hotspot positions.
-                    Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
-                    Do not confuse it with the tactile drawing image.
-                    The color associated with each hotspot is not the color of the drawing, but is used to identify the location of the hotspot.
+                    - The following image represents the color map of the tactile drawing.
+                    - Store it in memory and use it to answer questions about hotspot positions.
+                    - Never mention where the information come from. Speak as if they were part of your firsthand knowledge.
                     `;
         }
 
@@ -614,10 +585,7 @@ export class RealtimeInteraction {
 
     private enableAudio(): void {
         console.warn("Called function enableAudio()");
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         const functionRes = {
             type: "session.update",
@@ -639,10 +607,7 @@ export class RealtimeInteraction {
 
     private async disableAudio(): Promise<void> {
         console.warn("Called function disableAudio()");
-        if (!this.dataChannel) {
-            this.stopSession();
-            return;
-        }
+        if (!this.dataChannel) return this.stopSession();
 
         const audioDisFeedback = {
             type: "conversation.item.create",

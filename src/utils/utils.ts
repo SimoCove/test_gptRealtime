@@ -4,7 +4,7 @@ export function imageToBase64(image: Blob | File): Promise<string> {
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
+        reader.onerror = () => reject(reader.error ?? new Error("Unknown FileReader error"));
         reader.readAsDataURL(image);
     });
 }
@@ -23,11 +23,6 @@ export function blobSizeInKB(blob: Blob): number {
     return (blob.size / 1024);
 }
 
-export function getBlobSizeFromBase64(base64String: string): number {
-    const blob = base64ToBlob(base64String);
-    return blobSizeInKB(blob);
-}
-
 export function showBlobTypeDimSize(blob: Blob, imageType: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -44,11 +39,6 @@ export function showBlobTypeDimSize(blob: Blob, imageType: string): Promise<void
 
 export function checkBlobSize(blob: Blob, max_size: number = 200): boolean {
     const imageSize = blobSizeInKB(blob);
-    return imageSize <= max_size;
-}
-
-export function checkBase64Size(base64String: string, max_size: number = 200): boolean {
-    const imageSize = getBlobSizeFromBase64(base64String);
     return imageSize <= max_size;
 }
 
@@ -117,7 +107,7 @@ export async function reduceResolution(blob: Blob, maxDimension: number = 600, f
 export function compressWebpBlob(blob: Blob, quality: number = 0.8): Promise<Blob> {
     return new Promise((resolve, reject) => {
         new Compressor(blob, {
-            quality: quality, // 0.0 (max compression) - 1.0
+            quality: quality, // 0.0 (max compression) - 1.0 (no compression)
             convertSize: Infinity,
             success(result) {
                 resolve(result);
