@@ -1,3 +1,4 @@
+import { getEphemeralKey } from "../ephemeralKey/getEphemeralKey";
 import sessionConfig from "./sessionConfig";
 import {
     imageToBase64,
@@ -49,9 +50,7 @@ export class RealtimeInteraction {
         return RealtimeInteraction.instance;
     }
 
-    public init(ephemeralKey: string | null): void {
-        this.ephemeralKey = ephemeralKey;
-
+    public init(): void {
         this.initializeUIElements();
         if (!this.elements) return console.error("UI elements not initialized");
 
@@ -127,6 +126,7 @@ export class RealtimeInteraction {
     }
 
     private async startSession(): Promise<void> {
+        this.ephemeralKey = await getEphemeralKey();
         if (!this.ephemeralKey) return;
 
         console.log("Starting session");
