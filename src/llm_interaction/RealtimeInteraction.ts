@@ -21,6 +21,7 @@ interface UIElements {
     sessionState: HTMLElement;
     audioState: HTMLElement;
     modelResponse: HTMLElement;
+    imgTemplateContainer: HTMLElement;
 }
 
 export class RealtimeInteraction {
@@ -67,7 +68,8 @@ export class RealtimeInteraction {
             stopBtn: document.getElementById("stopBtn") as HTMLButtonElement,
             sessionState: document.getElementById("sessionState") as HTMLElement,
             audioState: document.getElementById("audioState") as HTMLElement,
-            modelResponse: document.getElementById("modelResponse") as HTMLElement
+            modelResponse: document.getElementById("modelResponse") as HTMLElement,
+            imgTemplateContainer: document.getElementById("imgTemplateContainer") as HTMLElement
         }
     }
 
@@ -82,6 +84,9 @@ export class RealtimeInteraction {
             this.elements.stopBtn.disabled = false;
 
         } else {
+            this.elements.imgTemplateContainer.hidden = true;
+            this.elements.imgTemplateContainer.innerHTML = "";
+
             this.elements.modelResponse.textContent = "The model response will appear here...";
 
             this.elements.sessionState.textContent = "Session off";
@@ -408,7 +413,7 @@ export class RealtimeInteraction {
 
     private async getFileData(): Promise<string> {
         try {
-            const path = "/Islet/data.json";
+            const path = "/House_with_rainbow/data.json";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             return await response.json();
@@ -421,7 +426,7 @@ export class RealtimeInteraction {
 
     private async getFileTemplate(): Promise<string> {
         try {
-            const path = "/Islet/template.png";
+            const path = "/House_with_rainbow/template.png";
             const response = await fetch(path);
             if (!response.ok) throw new Error(`Cannot fetch ${path}`);
             const blob = await response.blob();
@@ -458,6 +463,8 @@ export class RealtimeInteraction {
         this.sendData(dataOutput);
         await this.sendImage(templateOutput, "template");
         await this.sendImage(colorMapOutput, "colorMap");
+
+        this.showImageTemplate(templateOutput);
     }
 
     private sendData(data: string): void {
@@ -569,6 +576,19 @@ export class RealtimeInteraction {
             console.error("Image compression error:", err);
             return null;
         }
+    }
+
+    private showImageTemplate(base64Img: string): void {
+        if (!this.elements) return console.error("UI elements not initialized");
+        
+        this.elements.imgTemplateContainer.innerHTML = "";
+        this.elements.imgTemplateContainer.hidden = false;
+
+        const img = document.createElement("img");
+        img.src = base64Img;
+        img.classList.add("imgTemplate");
+
+        this.elements.imgTemplateContainer.appendChild(img);
     }
 
     private handleFunctionCalls(msg: RealtimeMessage): void {
