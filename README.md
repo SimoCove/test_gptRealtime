@@ -3,7 +3,8 @@
 The application allows you to interact with **gpt-realtime** by voice.  
 Responses are always transcribed into text format.  
 You can enable or disable GPT’s voice responses by speaking the specified *wake word* or *sleep word*.  
-The model can also answer questions about the loaded drawing.
+The model can also answer questions about the loaded drawing.  
+You can use the appropriate input fields to set the pointing coordinates in the drawing and send them to gpt to use specific spatial references.
 
 # Preparation
 
