@@ -1,0 +1,54 @@
+{
+    "metadata": {
+        "title": "Car",
+        "shortDescription": "A small, rounded-shaped car.",
+        "longDescription": "Only the right side of the car is visible. Here, two windows can be seen, attached to each other but separated by a single vertical line. They are triangular in shape, with the longer side rounded. The car has one headlight visible at the front and one at the rear. Only one door is visible, located directly below the front window. The vehicle is supported by two wheels visible on the side, which consist of two concentric circles.",
+        "creationDate": "2025-10-16",
+        "lastUpdate": "2025-10-16",
+        "lang": "en-US"
+    },
+    "options": {
+        "noTemplateDetectedMsg": true,
+        "noHandDetectedMsg": true,
+        "tooManyHandsMsg": true,
+        "notPointingMsg": true,
+        "noHotspotInfoMsg": true,
+        "speechSynthesis": false,
+        "playSounds": true,
+        "fixTactilePaper": false,
+        "debugMode": false,
+        "templateMatchingInterval": 0
+    },
+    "hotspots": [
+        {
+            "color": [
+                158,
+                158,
+                158,
+                1
+            ],
+            "title": "Wheel",
+            "description": "A simple circle with another circle inside represents the vehicle's wheel."
+        },
+        {
+            "color": [
+                63,
+                81,
+                181,
+                1
+            ],
+            "title": "Bodywork",
+            "description": "The vehicle's body has a rounded shape. Only one door (the front one) is visible on the side of the car."
+        },
+        {
+            "color": [
+                0,
+                188,
+                212,
+                1
+            ],
+            "title": "Window",
+            "description": "The car window has a triangular shape, but with the longest side rounded, to follow the line of the bodywork."
+        }
+    ]
+}

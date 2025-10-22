@@ -1,0 +1,16 @@
+{
+  "name": "test_gptrealtime_interaction",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "start": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "compressorjs": "^1.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}
