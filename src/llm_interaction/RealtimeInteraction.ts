@@ -44,7 +44,7 @@ export class RealtimeInteraction {
 
     private flagAudioDisFeedback: boolean = false;
     private finalBase64Template: string | null = null;
-    private lastPointedPosition: { lastX: number | null, lastY: number | null } = { lastX: null, lastY: null };
+    private lastPointedPosition: { lastX: number | null, lastY: number | null } = { lastX: 10000, lastY: 10000}; // 10000 are placeholders that are changed when session starts
 
     private constructor() { }
 
@@ -104,8 +104,8 @@ export class RealtimeInteraction {
 
         } else {
             this.elements.coordContainer.hidden = true;
-            this.elements.xCoord.valueAsNumber = 0;
-            this.elements.yCoord.valueAsNumber = 0;
+            this.elements.xCoord.value = "";
+            this.elements.yCoord.value = "";
 
             this.elements.imgTemplateContainer.hidden = true;
             this.elements.imgTemplateContainer.innerHTML = "";
