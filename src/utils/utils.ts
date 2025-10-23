@@ -104,7 +104,7 @@ export async function reduceResolution(blob: Blob, maxDimension: number = 600, f
     });
 }
 
-export function getimgDimensions(base64Img: string): Promise<{ x: number; y: number }> {
+export function getImgDimensions(base64Img: string): Promise<{ x: number; y: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve({ x: img.naturalWidth, y: img.naturalHeight });
@@ -128,7 +128,9 @@ export function compressWebpBlob(blob: Blob, quality: number = 0.8): Promise<Blo
     });
 }
 
-export async function drawPointedPosition(base64Img: string, x: number, y: number, radius: number = 9): Promise<string> {
+export async function drawPointedPosition(base64Img: string, x: number | null, y: number | null, radius: number = 9): Promise<string> {
+    if (x === null || y === null) return base64Img;
+
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.src = base64Img;

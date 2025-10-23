@@ -7,7 +7,7 @@ import {
     checkBlobSize,
     toWebp,
     reduceResolution,
-    getimgDimensions,
+    getImgDimensions,
     compressWebpBlob,
     drawPointedPosition
 } from '../utils/utils';
@@ -27,7 +27,6 @@ interface UIElements {
     coordContainer: HTMLElement;
     xCoord: HTMLInputElement;
     yCoord: HTMLInputElement;
-    sendCoordsBtn: HTMLButtonElement;
     imgTemplateContainer: HTMLElement;
 }
 
@@ -45,6 +44,7 @@ export class RealtimeInteraction {
 
     private flagAudioDisFeedback: boolean = false;
     private finalBase64Template: string | null = null;
+    private lastPointedPosition: { lastX: number | null, lastY: number | null } = { lastX: null, lastY: null };
 
     private constructor() { }
 
@@ -71,7 +71,6 @@ export class RealtimeInteraction {
             this.enforceInputMinMax(this.elements!.yCoord);
             this.updateImageView();
         };
-        this.elements.sendCoordsBtn.onclick = () => { this.sendImgWIthPosAndCoords() };
 
         this.handleSessionState(false);
         this.handleAudioState(false);
@@ -87,7 +86,6 @@ export class RealtimeInteraction {
             coordContainer: document.getElementById("coordContainer") as HTMLElement,
             xCoord: document.getElementById("xCoord") as HTMLInputElement,
             yCoord: document.getElementById("yCoord") as HTMLInputElement,
-            sendCoordsBtn: document.getElementById("sendCoordsBtn") as HTMLButtonElement,
             imgTemplateContainer: document.getElementById("imgTemplateContainer") as HTMLElement
         }
     }
@@ -106,8 +104,8 @@ export class RealtimeInteraction {
 
         } else {
             this.elements.coordContainer.hidden = true;
-            this.elements.xCoord.value = "0";
-            this.elements.yCoord.value = "0";
+            this.elements.xCoord.valueAsNumber = 0;
+            this.elements.yCoord.valueAsNumber = 0;
 
             this.elements.imgTemplateContainer.hidden = true;
             this.elements.imgTemplateContainer.innerHTML = "";
@@ -301,7 +299,7 @@ export class RealtimeInteraction {
         return true;
     }
 
-    private handleDataChannelMessages(e: MessageEvent): void {
+    private async handleDataChannelMessages(e: MessageEvent): Promise<void> {
         try {
             const msg: RealtimeMessage = JSON.parse(e.data);
             //console.log(msg);
@@ -329,6 +327,10 @@ export class RealtimeInteraction {
                     break;
 
                 // other messages
+                case "input_audio_buffer.speech_started":
+                    await this.sendPointedPositionIfNecessary();
+                    break;
+
                 case "response.content_part.added":
                     if (this.elements) this.elements.modelResponse.textContent = "";
                     break;
@@ -438,14 +440,14 @@ export class RealtimeInteraction {
     }
 
     private async getFileData(): Promise<string> {
-        const path = "/House_with_rainbow/data.json";
+        const path = "/Islet/data.json";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         return await response.json();
     }
 
     private async getFileTemplate(): Promise<string> {
-        const path = "/House_with_rainbow/template.png";
+        const path = "/Islet/template.png";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         const blob = await response.blob();
@@ -453,7 +455,7 @@ export class RealtimeInteraction {
     }
 
     private async getFileColorMap(): Promise<string> {
-        const path = "/House_with_rainbow/colorMap.png";
+        const path = "/Islet/colorMap.png";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         const blob = await response.blob();
@@ -480,9 +482,8 @@ export class RealtimeInteraction {
             if (finalTemplateOutput) {
                 this.finalBase64Template = finalTemplateOutput;
                 await this.sendImage(finalTemplateOutput, "template");
-
                 this.setInputCoordsMaxLimits(finalTemplateOutput);
-                this.showImage(finalTemplateOutput);
+                await this.updateImageView();
             }
             if (finalColorMapOutput) await this.sendImage(finalColorMapOutput, "colorMap");
 
@@ -531,7 +532,8 @@ export class RealtimeInteraction {
             const reducedDimBlob = await reduceResolution(blob); // reduce dimensions of the blob
             if (checkBlobSize(reducedDimBlob, maxImageSize)) return await imageToBase64(reducedDimBlob); // send image with reduced dimensions
 
-            const webpBlob = await toWebp(blob); // convert in webp image
+            const webpBlob = await toWebp(reducedDimBlob); // convert in webp image
+
             if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp converted image
 
             let quality = 0.9;
@@ -593,7 +595,7 @@ export class RealtimeInteraction {
     private async setInputCoordsMaxLimits(base64Img: string): Promise<void> {
         if (!this.elements) return console.error("UI elements not initialized");
 
-        const { x, y } = await getimgDimensions(base64Img);
+        const { x, y } = await getImgDimensions(base64Img);
         this.elements.xCoord.max = x.toString();
         this.elements.yCoord.max = y.toString();
     }
@@ -615,14 +617,8 @@ export class RealtimeInteraction {
         if (!this.elements) return console.error("UI elements not initialized");
         if (!this.finalBase64Template) return;
 
-        if (this.elements.xCoord.value === "" ||
-            this.elements.xCoord.value == null ||
-            this.elements.yCoord.value === "" ||
-            this.elements.yCoord.value == null
-        ) return;
-
-        const x = parseInt(this.elements.xCoord.value);
-        const y = parseInt(this.elements.yCoord.value);
+        const x = Number.isNaN(this.elements.xCoord.valueAsNumber) ? null : this.elements.xCoord.valueAsNumber;
+        const y = Number.isNaN(this.elements.yCoord.valueAsNumber) ? null : this.elements.yCoord.valueAsNumber;
 
         const newImageView = await drawPointedPosition(this.finalBase64Template, x, y);
         this.showImage(newImageView);
@@ -709,37 +705,102 @@ export class RealtimeInteraction {
     }
 
     private enforceInputMinMax(input: HTMLInputElement): void {
-        const max = parseFloat(input.max);
-        const min = parseFloat(input.min);
-        let value = parseFloat(input.value);
+        const max = parseInt(input.max);
+        const min = parseInt(input.min);
+        let value = input.valueAsNumber;
 
         if (isNaN(value)) return;
 
         if (value > max) value = max;
         if (value < min) value = min;
 
-        input.value = value.toString();
+        input.valueAsNumber = value;
     }
 
-    private async sendImgWIthPosAndCoords(): Promise<void> {
-        if (!this.elements) return console.error("UI elements not initialized");
-        if (!this.dataChannel) return this.stopSession();
-        if (!this.finalBase64Template) return;
+    private async sendPointedPositionIfNecessary(): Promise<void> {
+        try {
+            const { x: currentX, y: currentY } = this.getCurrentPointedPosition();
+            const { x: lastX, y: lastY } = this.getLastPointedPosition();
+            const positionChanged = this.checkPointedPositionVariation(currentX, currentY, lastX, lastY);
 
-        const xCoord = parseInt(this.elements.xCoord.value);
-        const yCoord = parseInt(this.elements.yCoord.value);
+            if (positionChanged) {
+                this.lastPointedPosition = { lastX: currentX, lastY: currentY };
+                await this.sendPointedPositionImage(currentX, currentY);
+            }
 
-        if (isNaN(xCoord) || isNaN(yCoord)) {
-            alert("Please enter valid numeric coordinates.");
-            return;
+        } catch (err) {
+            if (err) console.error(err);
+            this.stopSession();
+        }
+    }
+
+    private getCurrentPointedPosition(): { x: number | null, y: number | null } {
+        if (!this.elements) throw new Error("UI elements not initialized");
+        if (!this.finalBase64Template) throw new Error("Image template missing");
+
+        const x = Number.isNaN(this.elements.xCoord.valueAsNumber) ? null : this.elements.xCoord.valueAsNumber;
+        const y = Number.isNaN(this.elements.yCoord.valueAsNumber) ? null : this.elements.yCoord.valueAsNumber;
+
+        return { x, y };
+    }
+
+    private getLastPointedPosition(): { x: number | null, y: number | null } {
+        if (!this.finalBase64Template) throw new Error("Image template missing");
+        const { lastX: x, lastY: y } = this.lastPointedPosition;
+        return { x, y };
+    }
+
+    private checkPointedPositionVariation(
+        currentX: number | null,
+        currentY: number | null,
+        lastX: number | null,
+        lastY: number | null,
+        threshold: number = 5 // pixel
+    ): boolean {
+        // if even just one of the two coordinates is null, it means that the user is not pointing
+        const currNull = currentX === null || currentY === null;
+        const lastNull = lastX === null || lastY === null;
+
+        // the user was not pointing before and is not pointing now --> no change
+        if (currNull && lastNull) {
+            return false;
         }
 
-        const { x, y } = await getimgDimensions(this.finalBase64Template); // image dimensions
-        // get normalized coordinates
-        const xNorm = (xCoord / x).toFixed(3);
-        const yNorm = (yCoord / y).toFixed(3);
+        // the user was not pointing before, but is pointing now --> change
+        if (!currNull && lastNull) {
+            return true;
+        }
 
-        const imgWithPosition = await drawPointedPosition(this.finalBase64Template, xCoord, yCoord);
+        // the user was pointing before, but is not pointing now --> change
+        if (currNull && !lastNull) {
+            return true;
+        }
+
+        // the user was pointing before and is pointing now --> threshold control
+        const diffX = Math.abs(currentX! - lastX!);
+        const diffY = Math.abs(currentY! - lastY!);
+        return diffX >= threshold || diffY >= threshold;
+    }
+
+    private async sendPointedPositionImage(currentX: number | null, currentY: number | null): Promise<void> {
+        if (!this.finalBase64Template) throw new Error("Image template missing");
+        if (!this.dataChannel) throw new Error("Data channel missing");
+
+        let textMsg = "";
+
+        if (currentX === null || currentY === null) {
+            textMsg = `
+                    THE USER IS NOT POINTING ANY POSITION:
+                    The following image represents the EMPTY template, without the position pointed by the user.
+                    `
+        } else {
+            textMsg = `
+                    USER POINTED POSITION:
+                    Follows the image representing the position.
+                    `
+        }
+
+        const imgWithPosition = await drawPointedPosition(this.finalBase64Template, currentX, currentY);
 
         const res = {
             type: "conversation.item.create",
@@ -749,13 +810,7 @@ export class RealtimeInteraction {
                 content: [
                     {
                         type: "input_text",
-                        text: `
-                            USER POINTED POSITION:
-                            The normalized coordinates of the position are:
-                            X = ${xNorm}, Y = ${yNorm}.
-                            Follows the image representing the position.
-                            Answer briefly.
-                        `
+                        text: textMsg
                     },
                     {
                         type: "input_image",
@@ -766,7 +821,6 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(res));
-        console.log("Image with position file and coordinates sent to the model");
-        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
+        console.log("User pointed position sent to the model");
     }
 }
