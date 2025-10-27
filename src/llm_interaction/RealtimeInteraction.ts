@@ -354,7 +354,7 @@ export class RealtimeInteraction {
                     this.handleSessionState(true);
 
                     this.initSession();
-                    //this.sendFileContent();
+                    this.sendFileContent();
                     break;
 
                 // errors
@@ -371,7 +371,7 @@ export class RealtimeInteraction {
 
                 // handle audio input
                 case "input_audio_buffer.committed":
-                    //await this.sendPointedPositionIfNecessary();
+                    await this.sendPointedPositionIfNecessary();
                     this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
                     break;
 
