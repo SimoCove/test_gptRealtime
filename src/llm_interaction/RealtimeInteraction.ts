@@ -738,18 +738,7 @@ export class RealtimeInteraction {
             const audioAlreadyDisabled = {
                 type: "response.create",
                 response: {
-                    input: [
-                        {
-                            type: "message",
-                            role: "user",
-                            content: [
-                                {
-                                    type: "input_text",
-                                    text: "Audio already disabled."
-                                }
-                            ]
-                        }
-                    ],
+                    instructions: "Do not call any function. Notify the user that audio is already disabled. Keep the response very short."
                 }
             }
             this.dataChannel.send(JSON.stringify(audioAlreadyDisabled));
@@ -776,18 +765,7 @@ export class RealtimeInteraction {
             type: "response.create",
             response: {
                 output_modalities: ["audio"],
-                input: [
-                    {
-                        type: "message",
-                        role: "user",
-                        content: [
-                            {
-                                type: "input_text",
-                                text: "Translate the phrase “Audio disabled” into the language you were using. Speak the translation exactly as written, without adding or removing any words."
-                            }
-                        ]
-                    }
-                ],
+                instructions: "Do not call any function. Notify the user that audio has been disabled. Keep the response very short."
             }
         }
 

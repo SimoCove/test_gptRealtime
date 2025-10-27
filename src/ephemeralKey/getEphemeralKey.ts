@@ -27,7 +27,6 @@ export async function getEphemeralKey(): Promise<string | null> {
         if (!res.ok) throw new Error("HTTP error:" + res.status);
         const data = await res.json();
         if (!data.value) throw new Error("missing ephemeral key");
-
         return data.value;
 
     } catch (err) {
