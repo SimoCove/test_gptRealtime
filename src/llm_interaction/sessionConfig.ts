@@ -1,8 +1,21 @@
-export default {
-  type: "realtime",
-  model: "gpt-realtime",
-  output_modalities: ["text"],
-  instructions: `
+export default function createSessionConfig(defaultLang: string = "English (US)") {
+  return {
+    type: "realtime",
+    model: "gpt-realtime",
+    output_modalities: ["text"],
+    audio: {
+      input: {
+        turn_detection: {
+          type: "server_vad",
+          create_response: false, // disable auto responses
+          //interrupt_response: true
+        }
+      },
+      output: {
+        voice: "marin" // or cedar
+      }
+    },
+    instructions: `
     # Role
     You are "CamIO Assistant", a real-time AI assistant dedicated to describing and explaining tactile drawings for visually impaired users.
 
@@ -13,6 +26,13 @@ export default {
     
     # Instructions
     
+    ## Language
+    - When you hear only “CamIO start” with no other words, do not attempt to detect the user's language. Respond using ${defaultLang}.
+    - In all other cases, reply in the same language the user is currently speaking, but only if the language can be confidently identified. Do not infer the user's language from accent, pronunciation, or limited speech.
+    - If the user's language cannot be confidently determined, or no previous language has been confirmed, default to ${defaultLang}.
+    - If the user speaks very briefly or unclearly, continue using the last confirmed language instead of switching.
+    - Never mix languages in the same response, unless the user explicitly requests it.
+
     ## General Principles
     - Clearly indicate when providing descriptive information about the tactile drawing.
     - When describing or analyzing a tactile drawing, use only the information that is explicitly available from the provided sources.
@@ -61,28 +81,21 @@ export default {
     - Respond only to clear audio or text inputs.
     - If user input is unclear, ambiguous, unintelligible, or affected by background noise, ask for clarification.
     - After each clarification request or prompt for more information, validate user input in 1-2 lines and proceed or ask again if needed.
-    - Always reply in the user's language, if intelligible.
-    - Default to English if language cannot be determined.
-
-    ## Language
-    - Automatically detect the user's language from speech or text.
-    - Always answer in the language used by the user.
-    - If the language cannot be confidently determined, use the language indicated in the drawing's "lang" metadata (if available).
-    - If neither is available or language remains uncertain, default to English.
     `,
-  tools: [
-    {
-      type: "function",
-      name: "wake_word",
-      description: "Enable audio responses.",
-      parameters: { type: "object", properties: {}, required: [] }
-    },
-    {
-      type: "function",
-      name: "sleep_word",
-      description: "Disable audio responses.",
-      parameters: { type: "object", properties: {}, required: [] }
-    }
-  ],
-  tool_choice: "auto"
+    tools: [
+      {
+        type: "function",
+        name: "wake_word",
+        description: "Enable audio responses.",
+        parameters: { type: "object", properties: {}, required: [] }
+      },
+      {
+        type: "function",
+        name: "sleep_word",
+        description: "Disable audio responses.",
+        parameters: { type: "object", properties: {}, required: [] }
+      }
+    ],
+    tool_choice: "auto"
+  }
 }

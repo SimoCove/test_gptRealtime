@@ -1,5 +1,5 @@
 import { getEphemeralKey } from "../ephemeralKey/getEphemeralKey";
-import sessionConfig from "./sessionConfig";
+import createSessionConfig from "./sessionConfig";
 import {
     imageToBase64,
     base64ToBlob,
@@ -9,7 +9,8 @@ import {
     reduceResolution,
     getImgDimensions,
     compressWebpBlob,
-    drawPointedPosition
+    drawPointedPosition,
+    mapLangCodeToName
 } from '../utils/utils';
 
 type RealtimeMessage = {
@@ -39,12 +40,16 @@ export class RealtimeInteraction {
     private dataChannel: RTCDataChannel | null = null;
 
     private ephemeralKey: string | null = null;
-
     private elements: UIElements | null = null;
 
-    private flagAudioDisFeedback: boolean = false;
+    private audioResponsesOn: boolean = false;
+
     private finalBase64Template: string | null = null;
-    private lastPointedPosition: { lastX: number | null, lastY: number | null } = { lastX: 10000, lastY: 10000}; // 10000 are placeholders that are changed when session starts
+    private lastPointedPosition: { lastX: number | null, lastY: number | null } = { lastX: 10000, lastY: 10000 }; // 10000 are placeholders that are changed when session starts
+
+    // ---------------
+    // INITIALIZATION
+    // ---------------
 
     private constructor() { }
 
@@ -90,66 +95,9 @@ export class RealtimeInteraction {
         }
     }
 
-    private handleSessionState(state: boolean): void {
-        if (!this.elements) return console.error("UI elements not initialized");
-
-        if (state) {
-            this.elements.coordContainer.hidden = false;
-
-            this.elements.sessionState.textContent = "Session on";
-            this.elements.sessionState.classList.add("stateOn");
-            this.elements.sessionState.classList.remove("stateOff");
-            this.elements.startBtn.disabled = true;
-            this.elements.stopBtn.disabled = false;
-
-        } else {
-            this.elements.coordContainer.hidden = true;
-            this.elements.xCoord.value = "";
-            this.elements.yCoord.value = "";
-
-            this.elements.imgTemplateContainer.hidden = true;
-            this.elements.imgTemplateContainer.innerHTML = "";
-
-            this.elements.modelResponse.textContent = "The model response will appear here...";
-
-            this.elements.sessionState.textContent = "Session off";
-            this.elements.sessionState.classList.add("stateOff");
-            this.elements.sessionState.classList.remove("stateOn");
-            this.elements.startBtn.disabled = false;
-            this.elements.stopBtn.disabled = true;
-
-            this.finalBase64Template = null;
-        }
-    }
-
-    private handleAudioState(state: boolean): void {
-        if (!this.elements) return console.error("UI elements not initialized");
-
-        if (state) {
-            this.elements.audioState.textContent = "Audio on";
-            this.elements.audioState.classList.remove("stateDisabled");
-            this.elements.audioState.classList.add("stateEnabled");
-
-        } else {
-            this.elements.audioState.textContent = "Audio off";
-            this.elements.audioState.classList.add("stateDisabled");
-            this.elements.audioState.classList.remove("stateEnabled");
-        }
-    }
-
-    private logStatus(component: string, status: "ready" | "error" | "closed", detail?: string): void {
-        const prefix = '[' + component + ']';
-
-        if (status === "ready") {
-            console.log(prefix + ' Ready', detail ?? "");
-        } else if (status === "closed") {
-            console.log(prefix + ' Closed', detail ?? "");
-        } else {
-            const err = prefix + ' Error ' + (detail ?? "");
-            console.error(err);
-            alert(err);
-        }
-    }
+    // -----------------
+    // SESSION HANDLING
+    // -----------------
 
     private async startSession(): Promise<void> {
         this.ephemeralKey = await getEphemeralKey();
@@ -194,6 +142,101 @@ export class RealtimeInteraction {
         this.handleSessionState(false);
         this.handleAudioState(false);
     }
+
+    // ------------
+    // UI HANDLING
+    // ------------
+
+    private handleSessionState(state: boolean): void {
+        if (!this.elements) return console.error("UI elements not initialized");
+
+        if (state) {
+            this.elements.coordContainer.hidden = false;
+
+            this.elements.sessionState.textContent = "Session on";
+            this.elements.sessionState.classList.add("stateOn");
+            this.elements.sessionState.classList.remove("stateOff");
+            this.elements.startBtn.disabled = true;
+            this.elements.stopBtn.disabled = false;
+
+        } else {
+            this.elements.coordContainer.hidden = true;
+            this.elements.xCoord.value = "";
+            this.elements.yCoord.value = "";
+
+            this.elements.imgTemplateContainer.hidden = true;
+            this.elements.imgTemplateContainer.innerHTML = "";
+
+            this.elements.modelResponse.textContent = "The model response will appear here...";
+
+            this.elements.sessionState.textContent = "Session off";
+            this.elements.sessionState.classList.add("stateOff");
+            this.elements.sessionState.classList.remove("stateOn");
+            this.elements.startBtn.disabled = false;
+            this.elements.stopBtn.disabled = true;
+
+            this.finalBase64Template = null;
+        }
+    }
+
+    private handleAudioState(state: boolean): void {
+        if (!this.elements) return console.error("UI elements not initialized");
+
+        if (state) {
+            this.audioResponsesOn = true;
+            this.elements.audioState.textContent = "Audio on";
+            this.elements.audioState.classList.remove("stateDisabled");
+            this.elements.audioState.classList.add("stateEnabled");
+
+        } else {
+            this.audioResponsesOn = false;
+            this.elements.audioState.textContent = "Audio off";
+            this.elements.audioState.classList.add("stateDisabled");
+            this.elements.audioState.classList.remove("stateEnabled");
+        }
+    }
+
+    private async setInputCoordsMaxLimits(base64Img: string): Promise<void> {
+        if (!this.elements) return console.error("UI elements not initialized");
+
+        const { x, y } = await getImgDimensions(base64Img);
+        this.elements.xCoord.max = x.toString();
+        this.elements.yCoord.max = y.toString();
+    }
+
+    private enforceInputMinMax(input: HTMLInputElement): void {
+        const max = parseInt(input.max);
+        const min = parseInt(input.min);
+        let value = input.valueAsNumber;
+
+        if (isNaN(value)) return;
+
+        if (value > max) value = max;
+        if (value < min) value = min;
+
+        input.valueAsNumber = value;
+    }
+
+    // ------------
+    // CONSOLE LOG
+    // ------------
+
+    private logStatus(component: string, status: "ready" | "error" | "closed", detail?: string): void {
+        const prefix = '[' + component + ']';
+
+        if (status === "ready") {
+            console.log(prefix + ' Ready', detail ?? "");
+        } else if (status === "closed") {
+            console.log(prefix + ' Closed', detail ?? "");
+        } else {
+            const err = prefix + ' Error ' + (detail ?? "");
+            console.error(err);
+        }
+    }
+
+    // -----------------
+    // CONNECTION SETUP
+    // -----------------
 
     private setupPeerConnection(): boolean {
         this.peerConnection = new RTCPeerConnection();
@@ -285,11 +328,10 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.onerror = (e: Event) => {
-            console.error("[DataChannel] Error", e);
             if (e instanceof RTCErrorEvent) {
-                alert("[DataChannel] Error " + e.error.message);
+                console.error("[DataChannel] Error", e.error.message);
             } else {
-                alert("[DataChannel] Error");
+                console.error("[DataChannel] Error", e);
             }
             this.stopSession();
         };
@@ -306,12 +348,13 @@ export class RealtimeInteraction {
             //console.log(msg.type);
 
             switch (msg.type) {
+                // session created
                 case "session.created":
                     console.log("Session ready");
                     this.handleSessionState(true);
 
                     this.initSession();
-                    this.sendFileContent();
+                    //this.sendFileContent();
                     break;
 
                 // errors
@@ -326,11 +369,13 @@ export class RealtimeInteraction {
                     this.stopSession();
                     break;
 
-                // other messages
-                case "input_audio_buffer.speech_started":
-                    await this.sendPointedPositionIfNecessary();
+                // handle audio input
+                case "input_audio_buffer.committed":
+                    //await this.sendPointedPositionIfNecessary();
+                    this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
                     break;
 
+                // transcription of the text response in the UI
                 case "response.content_part.added":
                     if (this.elements) this.elements.modelResponse.textContent = "";
                     break;
@@ -343,6 +388,7 @@ export class RealtimeInteraction {
                     if (msg.delta && this.elements) this.elements.modelResponse.textContent += msg.delta;
                     break;
 
+                // transcription of the text response in console
                 case "response.output_text.done":
                     console.log("Response: " + msg.text);
                     break;
@@ -351,14 +397,7 @@ export class RealtimeInteraction {
                     console.log("Response: " + msg.transcript);
                     break;
 
-                case "output_audio_buffer.stopped":
-                    if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
-                    break;
-
-                case "output_audio_buffer.cleared":
-                    if (this.flagAudioDisFeedback) this.flagAudioDisFeedback = false;
-                    break;
-
+                // response done
                 case "response.done":
                     if (msg.response?.status === "failed") {
                         const error = msg.response.status_details?.error;
@@ -367,11 +406,10 @@ export class RealtimeInteraction {
                     }
                     break;
 
-                case "response.function_call_arguments.done": // a function was called
+                // function calls
+                case "response.function_call_arguments.done":
                     this.handleFunctionCalls(msg);
                     break;
-
-                default:
             }
 
         } catch (err) {
@@ -427,19 +465,37 @@ export class RealtimeInteraction {
         }
     }
 
-    // send to the model the first, instructive message
-    private initSession(): void {
+    // --------------------
+    // SEND INITIAL PROMPT
+    // --------------------
+
+    private async initSession(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
+
+        let langCode = "en-US";
+        let lang = "English (US)";
+        try {
+            const data = await this.getFileData();
+            langCode = data.metadata.lang || "en-US";
+            lang = mapLangCodeToName(langCode);
+
+        } catch (err) {
+            console.warn("Could not determine language from data.json, using English.");
+        }
 
         const config = {
             type: "session.update",
-            session: sessionConfig
-        }
+            session: createSessionConfig(lang)
+        };
 
         this.dataChannel.send(JSON.stringify(config));
     }
 
-    private async getFileData(): Promise<string> {
+    // -------------------------
+    // SEND .CAMIO FILE CONTENT
+    // -------------------------
+
+    private async getFileData(): Promise<any> {
         const path = "/Islet/data.json";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
@@ -462,7 +518,6 @@ export class RealtimeInteraction {
         return await imageToBase64(blob);
     }
 
-    // send the content from the .camio file to the model
     private async sendFileContent(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
 
@@ -592,13 +647,9 @@ export class RealtimeInteraction {
         console.warn("Image " + type + " file sent to the model");
     }
 
-    private async setInputCoordsMaxLimits(base64Img: string): Promise<void> {
-        if (!this.elements) return console.error("UI elements not initialized");
-
-        const { x, y } = await getImgDimensions(base64Img);
-        this.elements.xCoord.max = x.toString();
-        this.elements.yCoord.max = y.toString();
-    }
+    // --------------
+    // UI IMAGE VIEW
+    // --------------
 
     private showImage(base64Img: string): void {
         if (!this.elements) return console.error("UI elements not initialized");
@@ -624,6 +675,10 @@ export class RealtimeInteraction {
         this.showImage(newImageView);
     }
 
+    // ---------------
+    // FUNCTION CALLS
+    // ---------------
+
     private handleFunctionCalls(msg: RealtimeMessage): void {
         switch (msg.name) {
             case "wake_word":
@@ -640,20 +695,37 @@ export class RealtimeInteraction {
         console.warn("Called function enableAudio()");
         if (!this.dataChannel) return this.stopSession();
 
-        const functionRes = {
+        if (this.audioResponsesOn) { // audio already enabled
+            const audioAlreadyEnabled = {
+                type: "response.create",
+                response: {
+                    input: [
+                        {
+                            type: "message",
+                            role: "user",
+                            content: [
+                                {
+                                    type: "input_text",
+                                    text: "Audio already enabled."
+                                }
+                            ]
+                        }
+                    ],
+                }
+            }
+            this.dataChannel.send(JSON.stringify(audioAlreadyEnabled));
+            return;
+        }
+
+        const enableAudioOutput = {
             type: "session.update",
             session: {
                 type: "realtime",
                 output_modalities: ["audio"],
-                audio: {
-                    output: {
-                        voice: "cedar",
-                    }
-                }
             }
         }
 
-        this.dataChannel.send(JSON.stringify(functionRes));
+        this.dataChannel.send(JSON.stringify(enableAudioOutput));
         this.handleAudioState(true);
         this.dataChannel.send(JSON.stringify({ type: "response.create" }));
     }
@@ -662,21 +734,29 @@ export class RealtimeInteraction {
         console.warn("Called function disableAudio()");
         if (!this.dataChannel) return this.stopSession();
 
-        const audioDisFeedback = {
-            type: "conversation.item.create",
-            item: {
-                type: "message",
-                role: "user",
-                content: [
-                    {
-                        type: "input_text",
-                        text: "Translate the phrase “Audio disabled” into the language you were using. Speak the translation exactly as written, without adding or removing any words.",
-                    }
-                ]
+        if (!this.audioResponsesOn) { // audio already disabled
+            const audioAlreadyDisabled = {
+                type: "response.create",
+                response: {
+                    input: [
+                        {
+                            type: "message",
+                            role: "user",
+                            content: [
+                                {
+                                    type: "input_text",
+                                    text: "Audio already disabled."
+                                }
+                            ]
+                        }
+                    ],
+                }
             }
+            this.dataChannel.send(JSON.stringify(audioAlreadyDisabled));
+            return;
         }
 
-        const functionRes = {
+        const disableAudioOutput = {
             type: "session.update",
             session: {
                 type: "realtime",
@@ -684,38 +764,39 @@ export class RealtimeInteraction {
             }
         }
 
-        this.flagAudioDisFeedback = true;
-        this.dataChannel.send(JSON.stringify(audioDisFeedback));
-        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
-        await this.waitForResponse();
-
-        this.dataChannel.send(JSON.stringify(functionRes));
+        this.dataChannel.send(JSON.stringify(disableAudioOutput));
         this.handleAudioState(false);
+        this.feedbackAudioDisabled();
     }
 
-    private async waitForResponse(): Promise<void> {
-        return new Promise(resolve => {
-            const check = setInterval(() => {
-                if (!this.flagAudioDisFeedback) {
-                    clearInterval(check);
-                    resolve();
-                }
-            }, 50);
-        });
+    private feedbackAudioDisabled() {
+        if (!this.dataChannel) return this.stopSession();
+
+        const audioDisFeedback = {
+            type: "response.create",
+            response: {
+                output_modalities: ["audio"],
+                input: [
+                    {
+                        type: "message",
+                        role: "user",
+                        content: [
+                            {
+                                type: "input_text",
+                                text: "Translate the phrase “Audio disabled” into the language you were using. Speak the translation exactly as written, without adding or removing any words."
+                            }
+                        ]
+                    }
+                ],
+            }
+        }
+
+        this.dataChannel.send(JSON.stringify(audioDisFeedback));
     }
 
-    private enforceInputMinMax(input: HTMLInputElement): void {
-        const max = parseInt(input.max);
-        const min = parseInt(input.min);
-        let value = input.valueAsNumber;
-
-        if (isNaN(value)) return;
-
-        if (value > max) value = max;
-        if (value < min) value = min;
-
-        input.valueAsNumber = value;
-    }
+    // ----------------------
+    // USER POINTED POSITION
+    // ----------------------
 
     private async sendPointedPositionIfNecessary(): Promise<void> {
         try {

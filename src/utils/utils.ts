@@ -161,3 +161,16 @@ export async function drawPointedPosition(base64Img: string, x: number | null, y
         img.onerror = (e) => reject(e);
     });
 }
+
+export function mapLangCodeToName(langCode: string): string {
+  const map: Record<string, string> = {
+    "en-US": "English (US)",
+    "en-GB": "English (UK)",
+    "en-AU": "English (Australia)",
+    "it-IT": "Italian",
+    "fr-FR": "French",
+    "es-ES": "Spanish"
+  };
+
+  return map[langCode] || "English (US)";
+}
