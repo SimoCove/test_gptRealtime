@@ -1,0 +1,137 @@
+{
+    "metadata": {
+        "title": "House with rainbow",
+        "shortDescription": "House with rainbow",
+        "longDescription": "A cozy little house with many windows, a roof, and a door stands on a gently sloping lawn. A few small flowers grow on the grass. Behind the house, a huge rainbow supported by two clouds colors the sky. The weather seems crazy: behind the rainbow, a bright sun can still be seen, though partially obscured, while to one side, a cloud is raining heavy, large drops of water.",
+        "creationDate": "2025-10-16",
+        "lastUpdate": "2025-10-16",
+        "lang": "en-US"
+    },
+    "options": {
+        "noTemplateDetectedMsg": true,
+        "noHandDetectedMsg": true,
+        "tooManyHandsMsg": true,
+        "notPointingMsg": true,
+        "noHotspotInfoMsg": true,
+        "speechSynthesis": false,
+        "playSounds": true,
+        "fixTactilePaper": false,
+        "debugMode": false,
+        "templateMatchingInterval": 0
+    },
+    "hotspots": [
+        {
+            "color": [
+                255,
+                235,
+                59,
+                1
+            ],
+            "title": "Sun",
+            "description": "The sun illuminates the landscape with its rays. Only a portion of it is visible because the rainbow covers half of it.",
+            "sound": "fire-whoosh.mp3"
+        },
+        {
+            "color": [
+                156,
+                39,
+                176,
+                1
+            ],
+            "title": "Rainbow",
+            "description": "A vast rainbow extends across almost the entire design. It features six colors. It is supported by two clouds at its extremities. Its shape is that of a semicircle."
+        },
+        {
+            "color": [
+                158,
+                158,
+                158,
+                1
+            ],
+            "title": "Cloud",
+            "description": "The shape of the cloud is simple, as if drawn by a child."
+        },
+        {
+            "color": [
+                233,
+                30,
+                99,
+                1
+            ],
+            "title": "Roof",
+            "description": "The villa's visible roof is made up of two main sections: a lateral section and a front section. Both sections are triangular in shape, giving the home a welcoming, homey feel."
+        },
+        {
+            "color": [
+                76,
+                175,
+                80,
+                1
+            ],
+            "title": "Lawn",
+            "description": "A large, gently sloping lawn forms the hill on which the villa rests. A few solitary daisies grow on it."
+        },
+        {
+            "color": [
+                0,
+                188,
+                212,
+                1
+            ],
+            "title": "Rectangular window",
+            "description": "The window is rectangular in shape and has a thick, sturdy edge on all four sides. The glass in the center is divided into four equal rectangles by two perpendicular lines.",
+            "sound": "window-opening.mp3"
+        },
+        {
+            "color": [
+                3,
+                169,
+                244,
+                1
+            ],
+            "title": "Circular window",
+            "description": "A round window occupies the facade of the house's top floor. It features a thick, sturdy frame, and its glass is divided into four equal segments by two perpendicular lines.",
+            "sound": "window-opening.mp3"
+        },
+        {
+            "color": [
+                0,
+                150,
+                136,
+                1
+            ],
+            "title": "Rain",
+            "description": "A few large drops of rain fall beneath a cloud."
+        },
+        {
+            "color": [
+                255,
+                193,
+                7,
+                1
+            ],
+            "title": "Flower",
+            "description": "A flower with a simple shape and a single leaf."
+        },
+        {
+            "color": [
+                121,
+                85,
+                72,
+                1
+            ],
+            "title": "Door",
+            "description": "A door with a round handle and rectangular shape at the base and round at the top."
+        },
+        {
+            "color": [
+                255,
+                152,
+                0,
+                1
+            ],
+            "title": "Wall",
+            "description": "The wall is the main part that defines the shape of the villa."
+        }
+    ]
+}

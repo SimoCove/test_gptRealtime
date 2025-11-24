@@ -1,0 +1,86 @@
+{
+    "metadata": {
+        "title": "Airplane",
+        "shortDescription": "A small, stubby, rounded-shaped airplane is flying in the sky.",
+        "longDescription": "A small, short, round-shaped airliner is flying in the sky. It has two large wings with rounded tips and small tail surfaces. It also has several round windows on the sides, as well as a front cockpit window.",
+        "creationDate": "2025-10-31",
+        "lastUpdate": "2025-11-21",
+        "lang": "en-US"
+    },
+    "options": {
+        "noTemplateDetectedMsg": true,
+        "noHandDetectedMsg": true,
+        "tooManyHandsMsg": true,
+        "notPointingMsg": true,
+        "noHotspotInfoMsg": true,
+        "speechSynthesis": false,
+        "playSounds": true,
+        "fixTactilePaper": false,
+        "debugMode": false,
+        "templateMatchingInterval": 0,
+        "homographyMaxAge": 500,
+        "minInliers": 100
+    },
+    "hotspots": [
+        {
+            "color": [
+                255,
+                87,
+                34,
+                1
+            ],
+            "title": "Cabin window",
+            "description": "It has a circular shape and appears to be made of glass."
+        },
+        {
+            "color": [
+                121,
+                85,
+                72,
+                1
+            ],
+            "title": "Cockpit windshield",
+            "description": "It is large and appears to be made of glass."
+        },
+        {
+            "color": [
+                156,
+                39,
+                176,
+                1
+            ],
+            "title": "Wings",
+            "description": "They are large and have a rounded tip. They extend from the central part of the plane."
+        },
+        {
+            "color": [
+                205,
+                220,
+                57,
+                1
+            ],
+            "title": "Fuselage",
+            "description": "The main body of the plane is round and elongated. It has no sharp edges and is rather squat."
+        },
+        {
+            "color": [
+                233,
+                30,
+                99,
+                1
+            ],
+            "title": "Vertical stabilizer",
+            "description": "It has a round shape at the front and a square shape at the back. It resembles a shark's fin."
+        },
+        {
+            "color": [
+                63,
+                81,
+                181,
+                1
+            ],
+            "title": "Horizontal stabilizer",
+            "description": "It has a round shape at the front and a square shape at the back. It resembles a shark's fin. It is smaller than the vertical one."
+        }
+    ]
+}

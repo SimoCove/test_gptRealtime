@@ -1,0 +1,114 @@
+{
+    "metadata": {
+        "title": "Islet",
+        "shortDescription": "A small islet with a palm tree in the middle of the sea.",
+        "longDescription": "A small islet stands out in the calm sea. On it stands a palm tree with coconuts. A crab smiles happily on the islet. In the distance, larger islands and their snow-capped mountains can be seen. The sun shines high in the sky, partially obscured by the palm tree.",
+        "creationDate": "2025-10-16",
+        "lastUpdate": "2025-10-16",
+        "lang": "en-US"
+    },
+    "options": {
+        "noTemplateDetectedMsg": true,
+        "noHandDetectedMsg": true,
+        "tooManyHandsMsg": true,
+        "notPointingMsg": true,
+        "noHotspotInfoMsg": true,
+        "speechSynthesis": false,
+        "playSounds": true,
+        "fixTactilePaper": false,
+        "debugMode": false,
+        "templateMatchingInterval": 0
+    },
+    "hotspots": [
+        {
+            "color": [
+                76,
+                175,
+                80,
+                1
+            ],
+            "title": "Palm leaf",
+            "description": "Large drooping leaf that starts from the center of the tip of the palm."
+        },
+        {
+            "color": [
+                121,
+                85,
+                72,
+                1
+            ],
+            "title": "Coconut",
+            "description": "Perfectly spherical in shape, the coconut displays light reflections."
+        },
+        {
+            "color": [
+                255,
+                193,
+                7,
+                1
+            ],
+            "title": "Islet",
+            "description": "The islet is small and shaped like a small hill, appearing to be covered in sand. Its shape is simple and round."
+        },
+        {
+            "color": [
+                233,
+                30,
+                99,
+                1
+            ],
+            "title": "Crab",
+            "description": "The crab smiles as it raises its claws to the sky. It has two large eyes on its head and six small legs under its body."
+        },
+        {
+            "color": [
+                103,
+                58,
+                183,
+                1
+            ],
+            "title": "Island",
+            "description": "The island is far away and stands out against the sea, above the horizon. Snow-capped mountains can be seen on it."
+        },
+        {
+            "color": [
+                255,
+                235,
+                59,
+                1
+            ],
+            "title": "Sun",
+            "description": "The sun shines high in the sky, partially obscured by the palm tree. It has rays all around it."
+        },
+        {
+            "color": [
+                255,
+                87,
+                34,
+                1
+            ],
+            "title": "Palm trunk",
+            "description": "The trunk is slightly crooked and uneven. The base is thicker than the top. It has irregular horizontal lines."
+        },
+        {
+            "color": [
+                0,
+                150,
+                136,
+                1
+            ],
+            "title": "Grass leaf",
+            "description": "The grass leaf grows upwards from the shoulders of the lower part of the palm."
+        },
+        {
+            "color": [
+                33,
+                150,
+                243,
+                1
+            ],
+            "title": "Sea",
+            "description": "The sea surrounds the islet. Its water is calm, and the waves only ripple slightly when they crash against the base of the island."
+        }
+    ]
+}

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Test gpt-realtime</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+    <nav class="navbar bg-primary">
+        <div class="title-container">
+            <h2 id="title">Interaction with <b>gpt-realtime</b></h2>
+
+            <div class="tooltip-container">
+                <span class="tooltip-icon">?</span>
+                <span class="custom-tooltip">To enable voice responses, say "CamIO start", to disable
+                    them, say "CamIO stop"</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="session-container">
+            <div>
+                <button class="btn btn-secondary me-2" id="startBtn" disabled>Start session</button>
+                <button class="btn btn-secondary me-3" id="stopBtn" disabled>Stop session</button>
+                <span id="sessionState"></span>
+            </div>
+        </div>
+
+
+        <div class="row sections-container">
+            <div class="col-md-6 left-section-container">
+                <div class="left-section">
+                    <div class="topRow">
+                        <div id="coordsRow">
+                            <div class="coordField">
+                                <label for="xCoord" class="col-form-label">x:</label>
+                                <input type="number" id="xCoord" class="form-control" min="0">
+                            </div>
+
+                            <div class="coordField">
+                                <label for="yCoord" class="col-form-label">y:</label>
+                                <input type="number" id="yCoord" class="form-control" min="0">
+                            </div>
+                        </div>
+
+                        <div id="hotspotRow">
+                            <label for="hotspotSelect" class="col-form-label">Hotspot:</label>
+                            <select id="hotspotSelect" class="form-select"></select>
+                        </div>
+                    </div>
+
+                    <div id="image-area">
+                        <div id="imgTemplateContainer"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 right-section-container">
+                <div class="right-section">
+                    <div class="topRow">
+                        <div id="audioState">Audio off</div>
+                    </div>
+
+                    <div id="response-area">
+                        <div id="modelResponse">The model response will appear here...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="src/main"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const imgTemplateContainer = document.getElementById("imgTemplateContainer");
+            const modelResponse = document.getElementById("modelResponse");
+
+            function adjustResponseHeight() {
+                const img = imgTemplateContainer.querySelector("img");
+                if (img && img.complete) modelResponse.style.maxHeight = img.clientHeight + "px";
+            }
+
+            const observer = new MutationObserver(() => {
+                const img = imgTemplateContainer.querySelector("img");
+                if (img) {
+                    img.addEventListener("load", adjustResponseHeight);
+                    adjustResponseHeight();
+                }
+            });
+
+            observer.observe(imgTemplateContainer, { childList: true, subtree: true });
+
+            window.addEventListener("resize", adjustResponseHeight);
+        });
+    </script>
+</body>
+
+</html>
