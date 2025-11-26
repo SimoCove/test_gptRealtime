@@ -1,16 +1,21 @@
-export default function createSessionConfig(defaultLang: string = "English (US)") {
+export function createSessionConfig(
+  defaultLang: string = "English (US)",
+  enableAudioInput: boolean = true
+) {
   return {
     type: "realtime",
     model: "gpt-realtime",
     output_modalities: ["text"],
     audio: {
       input: {
-        turn_detection: {
-          type: "server_vad",
-          create_response: false, // disable auto responses
-          //interrupt_response: true,
-          silence_duration_ms: 500 // 500 default
-        }
+        turn_detection: enableAudioInput
+          ? {
+            type: "server_vad",
+            create_response: false, // disable auto responses
+            //interrupt_response: true,
+            silence_duration_ms: 500 // 500 default
+          }
+          : null
       },
       output: {
         voice: "cedar" // or marin

@@ -1,6 +1,14 @@
-import { camioFileName } from "../camioFileName";
+import {
+    POSITION_SENDING_METHOD,
+    TEST_MODE,
+    BENCHMARK_QUESTIONS,
+    CAMIO_FILE_NAME
+} from "../inputSettings";
+
 import { getEphemeralKey } from "../ephemeralKey/getEphemeralKey";
-import createSessionConfig from "./sessionConfig";
+import { createSessionConfig } from "./sessionConfig";
+import { BenchmarkQuestion } from "../testModeQuestions/benchmarkQuestions";
+
 import {
     imageToBase64,
     base64ToBlob,
@@ -21,23 +29,14 @@ type RealtimeMessage = {
     [key: string]: any; // allows for other unknown properties
 };
 
-type PositionSendingMethod =
-    | null
-    | "normCoord"
-    | "normCoordAndHotspot"
-    | "coord"
-    | "coordAndHotspot"
-    | "imgWithPos"
-    | "imgWithPosAndHotspot";
-
 type InputText = {
-  type: "input_text";
-  text: string;
+    type: "input_text";
+    text: string;
 };
 
 type InputImage = {
-  type: "input_image";
-  image_url: string;
+    type: "input_image";
+    image_url: string;
 };
 
 type PositionMessageItem = InputText | InputImage;
@@ -47,6 +46,7 @@ interface UIElements {
     startBtn: HTMLButtonElement;
     stopBtn: HTMLButtonElement;
     sessionState: HTMLElement;
+    runTestsBtn: HTMLButtonElement;
     audioState: HTMLElement;
     modelResponse: HTMLElement;
     xCoord: HTMLInputElement;
@@ -75,8 +75,7 @@ export class RealtimeInteraction {
 
     private lastImgWithPositionItemId: string | null = null;
 
-    private positionSendingMethod: PositionSendingMethod = "imgWithPosAndHotspot"; // you can change the position sending method here
-    // null, "normCoord", "normCoordAndHotspot", "coord", "coordAndHotspot", "imgWithPos", "imgWithPosAndHotspot"
+    private questionNumber: number = -1; // for test mode
 
     // ---------------
     // INITIALIZATION
@@ -99,8 +98,11 @@ export class RealtimeInteraction {
         this.elements.startBtn.onclick = () => this.startSession();
         this.elements.stopBtn.onclick = () => this.stopSession();
 
+        this.elements.runTestsBtn.onclick = () => this.runBenchmarkTests();
+
         this.handleSessionState(false);
         this.handleAudioState(false);
+        this.handleRunTestsBtn(false);
     }
 
     private initializeUIElements(): void {
@@ -108,6 +110,7 @@ export class RealtimeInteraction {
             startBtn: document.getElementById("startBtn") as HTMLButtonElement,
             stopBtn: document.getElementById("stopBtn") as HTMLButtonElement,
             sessionState: document.getElementById("sessionState") as HTMLElement,
+            runTestsBtn: document.getElementById("runTestsBtn") as HTMLButtonElement,
             audioState: document.getElementById("audioState") as HTMLElement,
             modelResponse: document.getElementById("modelResponse") as HTMLElement,
             xCoord: document.getElementById("xCoord") as HTMLInputElement,
@@ -164,6 +167,7 @@ export class RealtimeInteraction {
         console.log("Session closed");
         this.handleSessionState(false);
         this.handleAudioState(false);
+        this.handleRunTestsBtn(false);
     }
 
     // -------
@@ -210,6 +214,17 @@ export class RealtimeInteraction {
             this.audioResponsesOn = false;
             this.elements.audioState.textContent = "Audio off";
         }
+    }
+
+    private handleRunTestsBtn(state: boolean): void {
+        if (!this.elements) return console.error("UI elements not initialized");
+
+        if (!TEST_MODE) {
+            this.elements.runTestsBtn.hidden = true;
+            return;
+        }
+
+        this.elements.runTestsBtn.disabled = !state;
     }
 
     // ------------
@@ -347,6 +362,7 @@ export class RealtimeInteraction {
                 case "session.created":
                     console.log("Session ready");
                     this.handleSessionState(true);
+                    if (TEST_MODE) this.handleRunTestsBtn(true);
 
                     this.initSession();
                     this.sendFileContent();
@@ -376,9 +392,10 @@ export class RealtimeInteraction {
                     const item = msg.item;
                     // get item_id of image with position message
                     // note: this is not a robust method to extract pointed position image messages, but it is the simplest one
-                    if (item.content[0].type === "input_text" &&
-                        item.content[0].text === "The user is pointing at the position represented in this image:" &&
-                        item.content[1].type === "input_image") {
+                    if (item.type == "message" &&
+                        item.content?.[0]?.type === "input_text" &&
+                        item.content?.[0]?.text === "The user is pointing at the position represented in this image:" &&
+                        item.content?.[1]?.type === "input_image") {
                         this.setLastImgWithPositionItemID(item.id);
                     }
                     break;
@@ -414,6 +431,8 @@ export class RealtimeInteraction {
                         if (error) this.logStatus("DataChannel", "error", error.message);
                         this.stopSession();
                     }
+
+                    if (msg.response?.output?.[0]?.type === "message" && TEST_MODE) await this.sendTestMessage();
                     break;
 
                 // function calls
@@ -497,7 +516,7 @@ export class RealtimeInteraction {
 
         const config = {
             type: "session.update",
-            session: createSessionConfig(lang)
+            session: createSessionConfig(lang, !TEST_MODE)
         };
 
         this.dataChannel.send(JSON.stringify(config));
@@ -508,14 +527,14 @@ export class RealtimeInteraction {
     // -------------------------
 
     private async getFileData(): Promise<any> {
-        const path = "/" + camioFileName + "/data.json";
+        const path = "/" + CAMIO_FILE_NAME + "/data.json";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         return await response.json();
     }
 
     private async getFileTemplate(): Promise<string> {
-        const path = "/" + camioFileName + "/template.png";
+        const path = "/" + CAMIO_FILE_NAME + "/template.png";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         const blob = await response.blob();
@@ -523,7 +542,7 @@ export class RealtimeInteraction {
     }
 
     private async getFileColorMap(): Promise<string> {
-        const path = "/" + camioFileName + "/colorMap.png";
+        const path = "/" + CAMIO_FILE_NAME + "/colorMap.png";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         const blob = await response.blob();
@@ -680,7 +699,7 @@ export class RealtimeInteraction {
             type: "session.update",
             session: {
                 type: "realtime",
-                output_modalities: ["audio"],
+                output_modalities: ["text"], //AUDIO
             }
         }
 
@@ -727,7 +746,7 @@ export class RealtimeInteraction {
         const audioDisFeedback = {
             type: "response.create",
             response: {
-                output_modalities: ["audio"],
+                output_modalities: ["text"], //AUDIO
                 instructions: `
                     - Do not call any function.
                     - Only notify the user that audio has been disabled.
@@ -837,7 +856,7 @@ export class RealtimeInteraction {
             ? `It corresponds to this hotspot: ${hotspot}`
             : "It does not correspond to any known hotspot"}`;
 
-        switch (this.positionSendingMethod) {
+        switch (POSITION_SENDING_METHOD) {
             case "normCoord":
                 console.log("Pointed position normalized coordinates sent to the model");
                 return [{ type: "input_text", text: normCoordText }];
@@ -876,7 +895,7 @@ export class RealtimeInteraction {
                     { type: "input_text", text: imgHotspot }
                 ];
             }
-            
+
             default:
                 return null;
         }
@@ -900,5 +919,69 @@ export class RealtimeInteraction {
         };
 
         this.dataChannel!.send(JSON.stringify(deleteItem));
+    }
+
+    // ----------
+    // TEST MODE
+    // ----------
+
+    private async runBenchmarkTests(): Promise<void> {
+        this.handleRunTestsBtn(false);
+        await this.sendTestMessage();
+    }
+
+    private async sendTestMessage(): Promise<void> {
+        if (!this.dataChannel) return this.stopSession();
+
+        this.questionNumber++;
+        const question = BENCHMARK_QUESTIONS[this.questionNumber];
+
+        if (!question) {
+            this.questionNumber = -1;
+            this.handleRunTestsBtn(true);
+            return;
+        }
+
+        this.setTestCoordsAndHotspot(question);
+        await this.sendPointedPositionIfNecessary();
+        await this.sendTestQuestion(question);
+        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
+        this.startResponseTimer();
+    }
+
+    private setTestCoordsAndHotspot(question: BenchmarkQuestion): void {
+        if (!this.elements) return console.error("UI elements not initialized");
+
+        const { x, y } = question.position;
+        const hotspot = question.hotspot;
+
+        this.elements.xCoord.value = x != null ? String(x) : "";
+        this.elements.yCoord.value = y != null ? String(y) : "";
+
+        this.elements.xCoord.dispatchEvent(new Event("input", { bubbles: true }));
+        this.elements.yCoord.dispatchEvent(new Event("input", { bubbles: true }));
+
+        this.elements.hotspotSelect.value = hotspot != null ? hotspot : "null";
+    }
+
+    private async sendTestQuestion(quest: BenchmarkQuestion): Promise<void> {
+        if (!this.dataChannel) return this.stopSession();
+
+        const res = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "user",
+                content: [
+                    {
+                        type: "input_text",
+                        text: quest.question
+                    }
+                ]
+            }
+        }
+
+        this.dataChannel.send(JSON.stringify(res));
+        console.log(`Test question ${this.questionNumber + 1} sent to the model`);
     }
 }

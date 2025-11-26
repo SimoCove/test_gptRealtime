@@ -1,4 +1,4 @@
-import { camioFileName } from "../camioFileName";
+import { CAMIO_FILE_NAME } from "../inputSettings";
 import {
     imageToBase64,
     base64ToBlob,
@@ -84,7 +84,7 @@ export class PositionView {
     }
 
     private async getFileTemplate(): Promise<string> {
-        const path = "/" + camioFileName + "/template.png";
+        const path = "/" + CAMIO_FILE_NAME + "/template.png";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         const blob = await response.blob();
@@ -96,7 +96,7 @@ export class PositionView {
     // -------------
 
     private async getFileData(): Promise<any> {
-        const path = "/" + camioFileName + "/data.json";
+        const path = "/" + CAMIO_FILE_NAME + "/data.json";
         const response = await fetch(path);
         if (!response.ok) throw new Error(`Cannot fetch ${path}`);
         return await response.json();
