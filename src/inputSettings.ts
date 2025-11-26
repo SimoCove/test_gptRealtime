@@ -15,7 +15,7 @@ import {
     hwr2_positionQuestions
 } from "./testModeQuestions/benchmarkQuestions";
 
-export const POSITION_SENDING_METHOD: PositionSendingMethod = "imgWithPosAndHotspot"; // you can change the position sending method here
+export const POSITION_SENDING_METHOD: PositionSendingMethod = "coordAndHotspot"; // you can change the position sending method here
 export const CAMIO_FILE_NAME: string = "House_with_rainbow2"; // you can change the camio file here
 // Aeroplano
 // Airplane
@@ -27,4 +27,4 @@ export const CAMIO_FILE_NAME: string = "House_with_rainbow2"; // you can change 
 // Islet2
 
 export const TEST_MODE: boolean = true; // you can enable/disable the test mode here
-export const BENCHMARK_QUESTIONS: BenchmarkQuestion[] = islet2_genericQuestions; // you can change the benchmark questions for test mode here
+export const BENCHMARK_QUESTIONS: BenchmarkQuestion[] = hwr2_genericQuestions; // you can change the benchmark questions for test mode here
