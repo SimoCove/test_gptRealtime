@@ -69,6 +69,7 @@ export class RealtimeInteraction {
 
     private requestStartTime: number | null = null;
     private responseStarted: boolean = false;
+    private responseTimes: number[] = [];
 
     private grayScaleBase64Template: string | null = null;
     private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
@@ -520,6 +521,7 @@ export class RealtimeInteraction {
         };
 
         this.dataChannel.send(JSON.stringify(config));
+        console.log("Session configuration and system prompt sent to the model");
     }
 
     // -------------------------
@@ -769,8 +771,9 @@ export class RealtimeInteraction {
 
     private printResponseTime(): void {
         if (!this.responseStarted && this.requestStartTime != null) {
-            const latency = performance.now() - this.requestStartTime;
-            console.log(`Response time: ${latency.toFixed(0)} ms`);
+            const latency = Math.round(performance.now() - this.requestStartTime);
+            console.log(`Response time: ${latency} ms`);
+            if (TEST_MODE) this.responseTimes.push(latency);
             this.responseStarted = true;
         }
     }
@@ -831,6 +834,8 @@ export class RealtimeInteraction {
     }
 
     private async buildPointedPositionMessage(x: number | null, y: number | null, hotspot: string | null): Promise<PositionMessageContent | null> {
+        if (POSITION_SENDING_METHOD == null) return null;
+
         if (x === null || y === null) {
             console.log("No-pointing message sent to the model");
             return [{ type: "input_text", text: "The user is not pointing any position." }];
@@ -937,6 +942,12 @@ export class RealtimeInteraction {
         const question = BENCHMARK_QUESTIONS[this.questionNumber];
 
         if (!question) {
+            const averageResponseTime = Math.round(
+                this.responseTimes.reduce((sum, val) => sum + val, 0) / this.responseTimes.length
+            );
+            console.log(`Average response time: ${averageResponseTime} ms`)
+            this.responseTimes = [];
+
             this.questionNumber = -1;
             this.handleRunTestsBtn(true);
             return;
