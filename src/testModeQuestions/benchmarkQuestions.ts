@@ -355,8 +355,113 @@ export const hwr2_genericQuestions: BenchmarkQuestion[] = [
 
 export const hwr2_positionQuestions: BenchmarkQuestion[] = [
     {
+        position: {x: 515, y: 97},
+        hotspot: "Rain",
+        question: "What am I pointing at?"
+    },
+    {
+        position: {x: 160, y: 255},
+        hotspot: null,
+        question: "What am I indicating?"
+    },
+    {
         position: {x: null, y: null},
         hotspot: null,
-        question: ""
+        question: "Where am I?"
     },
+    {
+        position: {x: 442, y: 310},
+        hotspot: null,
+        question: "Is this a part of the sky?"
+    },
+    {
+        position: {x: 38, y: 246},
+        hotspot: "Rainbow",
+        question: "Is this a part of the sky?"
+    },
+    {
+        position: {x: 300, y: 398},
+        hotspot: "Lawn",
+        question: "Is this part of the house?"
+    },
+    {
+        position: {x: 416, y: 300},
+        hotspot: "Wall",
+        question: "Is this part of the house?"
+    },
+    {
+        position: {x: 30, y: 341},
+        hotspot: null,
+        question: "Is this the lawn?"
+    },
+    {
+        position: {x: 570, y: 376},
+        hotspot: "Lawn",
+        question: "Is this the lawn?"
+    },
+    {
+        position: {x: 450, y: 376},
+        hotspot: "Flower",
+        question: "Is this a flower's leaf?"
+    },
+    {
+        position: {x: 134, y: 376},
+        hotspot: "Flower",
+        question: "Is this the flower's head?"
+    },
+    {
+        position: {x: 555, y: 400},
+        hotspot: "Lawn",
+        question: "Am I near the sun?"
+    },
+    {
+        position: {x: 200, y: 20},
+        hotspot: null,
+        question: "Am I near the sun?"
+    },
+    {
+        position: {x: 100, y: 90},
+        hotspot: "Sun",
+        question: "Am I near the sun?"
+    },
+    {
+        position: {x: 556, y: 68},
+        hotspot: "Cloud",
+        question: "Is the rain far from here?"
+    },
+    {
+        position: {x: 163, y: 330},
+        hotspot: null,
+        question: "Is the rain far from here?"
+    },
+    {
+        position: {x: 556, y: 175},
+        hotspot: "Rain",
+        question: "Is the rain far from here?"
+    },
+    {
+        position: {x: 100, y: 69},
+        hotspot: "Sun",
+        question: "How far away is the circular window from here?"
+    },
+    {
+        position: {x: 300, y: 80},
+        hotspot: "Rainbow",
+        question: "What color is this element?"
+    },
+    {
+        position: {x: 325, y: 350},
+        hotspot: "Door",
+        question: "What is the color of this element?"
+    },
+    {
+        position: {x: 50, y: 130},
+        hotspot: "Sun",
+        question: "Tell me the color of this element."
+    },
+    {
+        position: {x: 270, y: 325},
+        hotspot: "Rectangular window",
+        question: "What is there around my current position?"
+    }
 ];
