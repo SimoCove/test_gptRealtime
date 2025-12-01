@@ -15,7 +15,7 @@ import {
     hwr2_positionQuestions
 } from "./testModeQuestions/benchmarkQuestions";
 
-export const POSITION_SENDING_METHOD: PositionSendingMethod = "coord"; // you can change the position sending method here
+export const POSITION_SENDING_METHOD: PositionSendingMethod = "imgWithPosAndHotspot"; // you can change the position sending method here
 export const CAMIO_FILE_NAME: string = "House_with_rainbow2"; // you can change the camio file here
 // Aeroplano
 // Airplane
