@@ -123,7 +123,7 @@ export const islet2_genericQuestions: BenchmarkQuestion[] = [
 ];
 
 export const islet2_positionQuestions: BenchmarkQuestion[] = [
-    /*{
+    {
         position: {x: 373, y: 314},
         hotspot: "Palm leaf",
         question: "What am I pointing at?"
@@ -232,7 +232,7 @@ export const islet2_positionQuestions: BenchmarkQuestion[] = [
         position: {x: 324, y: 200},
         hotspot: "Coconut",
         question: "What is there around my current position?"
-    },*/
+    },
     {
         position: {x: 10, y: 10},
         hotspot: null,
@@ -369,7 +369,7 @@ export const hwr2_genericQuestions: BenchmarkQuestion[] = [
 ];
 
 export const hwr2_positionQuestions: BenchmarkQuestion[] = [
-    /*{
+    {
         position: {x: 515, y: 97},
         hotspot: "Rain",
         question: "What am I pointing at?"
@@ -478,7 +478,7 @@ export const hwr2_positionQuestions: BenchmarkQuestion[] = [
         position: {x: 270, y: 325},
         hotspot: "Rectangular window",
         question: "What is there around my current position?"
-    },*/
+    },
     {
         position: {x: 500, y: 10},
         hotspot: null,
