@@ -26,5 +26,5 @@ export const CAMIO_FILE_NAME: string = "Islet2"; // you can change the camio fil
 // Islet
 // Islet2
 
-export const TEST_MODE: boolean = false; // you can enable/disable the test mode here
+export const TEST_MODE: boolean = true; // you can enable/disable the test mode here
 export const BENCHMARK_QUESTIONS: BenchmarkQuestion[] = islet2_positionQuestions; // you can change the benchmark questions for test mode here
