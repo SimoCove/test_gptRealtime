@@ -383,7 +383,7 @@ export class RealtimeInteraction {
 
                 // handle audio input
                 case "input_audio_buffer.committed":
-                    await this.sendPointedPositionIfNecessary();
+                    await this.sendPointedPosition();
                     this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
                     this.startResponseTimer();
                     break;
@@ -701,7 +701,7 @@ export class RealtimeInteraction {
             type: "session.update",
             session: {
                 type: "realtime",
-                output_modalities: ["text"], //AUDIO
+                output_modalities: ["audio"], // text, if using test mode
             }
         }
 
@@ -748,7 +748,7 @@ export class RealtimeInteraction {
         const audioDisFeedback = {
             type: "response.create",
             response: {
-                output_modalities: ["text"], //AUDIO
+                output_modalities: ["audio"], // text, if using test mode
                 instructions: `
                     - Do not call any function.
                     - Only notify the user that audio has been disabled.
@@ -799,7 +799,7 @@ export class RealtimeInteraction {
         return hotspot;
     }
 
-    private async sendPointedPositionIfNecessary(): Promise<void> {
+    private async sendPointedPosition(): Promise<void> {
         try {
             if (!this.dataChannel) throw new Error("Data channel missing");
 
@@ -954,7 +954,7 @@ export class RealtimeInteraction {
         }
 
         this.setTestCoordsAndHotspot(question);
-        await this.sendPointedPositionIfNecessary();
+        await this.sendPointedPosition();
         await this.sendTestQuestion(question);
         this.dataChannel.send(JSON.stringify({ type: "response.create" }));
         this.startResponseTimer();
