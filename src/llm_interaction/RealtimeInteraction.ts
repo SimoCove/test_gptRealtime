@@ -250,30 +250,36 @@ export class RealtimeInteraction {
     // -----------------
 
     private setupPeerConnection(): boolean {
-        this.peerConnection = new RTCPeerConnection();
-        if (!this.peerConnection) {
+        try {
+            this.peerConnection = new RTCPeerConnection();
+            //this.logStatus("PeerConnection", "ready");
+            return true;
+
+        } catch (err) {
             this.logStatus("PeerConnection", "error", "Failed initializing PeerConnection");
             this.stopSession();
             return false;
         }
+    }
 
-        //this.logStatus("PeerConnection", "ready");
+    private checkPeerConnection(): boolean {
+        if (!this.peerConnection) {
+            this.logStatus("PeerConnection", "error", "PeerConnection not available");
+            this.stopSession();
+            return false;
+        }
         return true;
     }
 
     // captures audio sent by the model and plays it back
     private setupRemoteAudio(): boolean {
-        if (!this.peerConnection) {
-            this.logStatus("RemoteAudio", "error", "PeerConnection not available");
-            this.stopSession();
-            return false;
-        }
+        if (!this.checkPeerConnection()) return false;
 
         this.audioElement = document.createElement("audio");
         document.body.appendChild(this.audioElement);
         this.audioElement.autoplay = true;
 
-        this.peerConnection.ontrack = (e) => {
+        this.peerConnection!.ontrack = (e) => {
             this.audioElement!.srcObject = e.streams[0] ?? null;
 
             this.audioElement!.onloadedmetadata = () => {
@@ -291,11 +297,7 @@ export class RealtimeInteraction {
 
     // captures microphone audio and sends it to the model
     private async setupLocalAudio(): Promise<boolean> {
-        if (!this.peerConnection) {
-            this.logStatus("LocalAudio", "error", "PeerConnection not available");
-            this.stopSession();
-            return false;
-        }
+        if (!this.checkPeerConnection()) return false;
 
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -317,13 +319,9 @@ export class RealtimeInteraction {
     }
 
     private setupDataChannel(): boolean {
-        if (!this.peerConnection) {
-            this.logStatus("DataChannel", "error", "PeerConnection not available");
-            this.stopSession();
-            return false;
-        }
+        if (!this.checkPeerConnection()) return false;
 
-        this.dataChannel = this.peerConnection.createDataChannel("oai-events") ?? null;
+        this.dataChannel = this.peerConnection!.createDataChannel("oai-events") ?? null;
         if (!this.dataChannel) {
             this.logStatus("DataChannel", "error", "Failed initializing dataChannel");
             this.stopSession();
@@ -335,16 +333,18 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.onclose = () => {
+            this.stopSession();
             //this.logStatus("DataChannel", "closed");
         }
 
         this.dataChannel.onerror = (e: Event) => {
             if (e instanceof RTCErrorEvent) {
-                console.error("[DataChannel] Error", e.error.message);
+                console.error("[DataChannel] RTCError:", e.error.message);
+                // fatal error
+                if (e.error.errorDetail === "sctp-failure") this.stopSession();
             } else {
                 console.error("[DataChannel] Error", e);
             }
-            this.stopSession();
         };
 
         this.dataChannel.onmessage = (e: MessageEvent) => this.handleDataChannelMessages(e);
@@ -456,14 +456,10 @@ export class RealtimeInteraction {
 
     private async connectToModel(): Promise<void> {
         try {
-            if (!this.peerConnection) {
-                this.logStatus("ConnectToModel", "error", "PeerConnection not available");
-                this.stopSession();
-                return;
-            }
+            if (!this.checkPeerConnection()) return;
 
-            const offer = await this.peerConnection.createOffer();
-            await this.peerConnection.setLocalDescription(offer);
+            const offer = await this.peerConnection!.createOffer();
+            await this.peerConnection!.setLocalDescription(offer);
 
             const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
                 method: "POST",
@@ -483,7 +479,7 @@ export class RealtimeInteraction {
                 type: "answer",
                 sdp: await sdpResponse.text()
             };
-            await this.peerConnection.setRemoteDescription(answer);
+            await this.peerConnection!.setRemoteDescription(answer);
 
             //this.logStatus("ConnectToModel", "ready");
 
