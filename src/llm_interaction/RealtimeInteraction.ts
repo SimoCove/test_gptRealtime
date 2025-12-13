@@ -75,6 +75,7 @@ export class RealtimeInteraction {
     private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private lastImgWithPositionItemId: string | null = null;
+    private lastResponseId: string | null = null;
 
     private questionNumber: number = -1; // for test mode
 
@@ -137,6 +138,7 @@ export class RealtimeInteraction {
         await this.connectToModel();
 
         this.resetLastImgWithPositionItemId();
+        this.resetLastResponseId();
     }
 
     private stopSession(): void {
@@ -177,6 +179,10 @@ export class RealtimeInteraction {
 
     private resetLastImgWithPositionItemId(): void {
         this.lastImgWithPositionItemId = null;
+    }
+
+    private resetLastResponseId(): void {
+        this.lastResponseId = null;
     }
 
     // ------------
@@ -383,6 +389,7 @@ export class RealtimeInteraction {
 
                 // handle audio input
                 case "input_audio_buffer.committed":
+                    console.log("Audio request sent to the LLM");
                     await this.sendPointedPosition();
                     this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
                     this.startResponseTimer();
@@ -418,15 +425,17 @@ export class RealtimeInteraction {
 
                 // transcription of the text response in console
                 case "response.output_text.done":
-                    console.log("Response: " + msg.text);
+                    console.log("LLM response: " + msg.text);
                     break;
 
                 case "response.output_audio_transcript.done":
-                    console.log("Response: " + msg.transcript);
+                    console.log("LLM response: " + msg.transcript);
                     break;
 
                 // response done
                 case "response.done":
+                    this.lastResponseId = msg.response?.output?.[0].id;
+
                     if (msg.response?.status === "failed") {
                         const error = msg.response.status_details?.error;
                         if (error) this.logStatus("DataChannel", "error", error.message);
@@ -550,24 +559,28 @@ export class RealtimeInteraction {
     private async sendFileContent(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
 
+        console.log("Sending project files to the LLM...");
+
         try {
             const dataOutput = JSON.stringify(await this.getFileData()); // json string
             const templateOutput = await this.getFileTemplate(); // base64 string
             const colorMapOutput = await this.getFileColorMap(); // base64 string
 
+            const sendableTemplate = await this.getSendableImage(templateOutput); // base64 string
+            const sendableColorMap = await this.getSendableImage(colorMapOutput); // base64 string
+
+            if (!sendableTemplate) throw new Error("The template image is too large to be sent to LLM");
+            if (!sendableColorMap) throw new Error("The color map image is too large to be sent to LLM");
+
+            this.grayScaleBase64Template = await base64ToGrayScale(sendableTemplate);
+            this.imgDimensions = await getImgDimensions(sendableTemplate);
+
             this.sendData(dataOutput);
+            await this.sendImage(sendableTemplate, "template");
+            await this.sendImage(sendableColorMap, "colorMap");
 
-            const finalTemplateOutput = await this.getSendableImage(templateOutput);
-            const finalColorMapOutput = await this.getSendableImage(colorMapOutput);
-
-            if (!finalTemplateOutput) throw new Error("The template image is too large to be sent");
-            if (!finalColorMapOutput) throw new Error("The color map image is too large to be sent");
-
-            this.grayScaleBase64Template = await base64ToGrayScale(finalTemplateOutput);
-            this.imgDimensions = await getImgDimensions(finalTemplateOutput);
-            await this.sendImage(finalTemplateOutput, "template");
-            await this.sendImage(finalColorMapOutput, "colorMap");
-            console.log(`Image dimensions: ${this.imgDimensions.x}x${this.imgDimensions.y}`)
+            //console.log(`Image dimensions: ${this.imgDimensions.x}x${this.imgDimensions.y} px`);
+            console.log(`Project files sent to the model`);
 
         } catch (err) {
             console.error("Failed to prepare or send file content:", err);
@@ -655,7 +668,7 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(res));
-        console.warn("Image " + type + " file sent to the model");
+        console.warn("Image " + type + " file sent to the the LLM");
     }
 
     // ---------------
@@ -686,7 +699,8 @@ export class RealtimeInteraction {
                         - Do not call any function.
                         - Only notify the user that audio is already enabled.
                         - Keep the response very short.
-                        `
+                        `,
+                    input: []
                 }
             }
             this.dataChannel.send(JSON.stringify(audioAlreadyEnabled));
@@ -718,7 +732,8 @@ export class RealtimeInteraction {
                         - Do not call any function.
                         - Only notify the user that audio is already disabled.
                         - Keep the response very short.
-                        `
+                        `,
+                    input: []
                 }
             }
             this.dataChannel.send(JSON.stringify(audioAlreadyDisabled));
@@ -749,7 +764,8 @@ export class RealtimeInteraction {
                     - Do not call any function.
                     - Only notify the user that audio has been disabled.
                     - Keep the response very short.
-                    `
+                    `,
+                input: []
             }
         }
 
@@ -768,7 +784,7 @@ export class RealtimeInteraction {
     private printResponseTime(): void {
         if (!this.responseStarted && this.requestStartTime != null) {
             const latency = Math.round(performance.now() - this.requestStartTime);
-            console.log(`Response time: ${latency} ms`);
+            console.log(`LLM response time: ${latency} ms`);
             if (TEST_MODE) this.responseTimes.push(latency);
             this.responseStarted = true;
         }
@@ -811,10 +827,12 @@ export class RealtimeInteraction {
                     type: "message",
                     role: "user",
                     content: contentRes
-                }
+                },
+                ...(this.lastResponseId && { previous_item_id: this.lastResponseId })
             };
 
             this.dataChannel.send(JSON.stringify(res));
+            this.logPositionSent(x, y, hotspot);
 
         } catch (err) {
             if (err) console.error(err);
@@ -833,7 +851,6 @@ export class RealtimeInteraction {
         if (POSITION_SENDING_METHOD == null) return null;
 
         if (x === null || y === null) {
-            console.log("No-pointing message sent to the model");
             return [{ type: "input_text", text: "The user is not pointing any position." }];
         }
 
@@ -859,26 +876,21 @@ export class RealtimeInteraction {
 
         switch (POSITION_SENDING_METHOD) {
             case "normCoord":
-                console.log("Pointed position normalized coordinates sent to the model");
                 return [{ type: "input_text", text: normCoordText }];
 
             case "normCoordAndHotspot":
-                console.log("Pointed position normalized coordinates and hotspot sent to the model");
                 return [{ type: "input_text", text: `${normCoordText}\n${coordHotspot}` }];
 
             case "coord":
-                console.log("Pointed position coordinates sent to the model");
                 return [{ type: "input_text", text: `${coordText}\n${imgDimText}` }];
 
             case "coordAndHotspot":
-                console.log("Pointed position coordinates and hotspot sent to the model");
                 return [{ type: "input_text", text: `${coordText}\n${coordHotspot}\n${imgDimText}` }];
 
             case "imgWithPos": {
                 if (!this.grayScaleBase64Template) throw new Error("Gray scale image template missing");
                 const imgWithPosition = await drawPointedPosition(this.grayScaleBase64Template, x, y);
                 this.deleteLastImgWithPosition();
-                console.log("Pointed position image sent to the model");
                 return [
                     { type: "input_text", text: "The user is pointing at the position represented in this image:" },
                     { type: "input_image", image_url: imgWithPosition }
@@ -889,7 +901,6 @@ export class RealtimeInteraction {
                 if (!this.grayScaleBase64Template) throw new Error("Gray scale image template missing");
                 const imgWithPosition = await drawPointedPosition(this.grayScaleBase64Template!, x, y);
                 this.deleteLastImgWithPosition();
-                console.log("Pointed position image and hotspot sent to the model");
                 return [
                     { type: "input_text", text: "The user is pointing at the position represented in this image:" },
                     { type: "input_image", image_url: imgWithPosition },
@@ -899,6 +910,40 @@ export class RealtimeInteraction {
 
             default:
                 return null;
+        }
+    }
+
+    private logPositionSent(
+        x: number | null,
+        y: number | null,
+        hotspot: string | null
+    ): void {
+        if (POSITION_SENDING_METHOD == null) return;
+
+        if (x === null || y === null) return console.log("No-pointing message sent to the LLM");
+
+        //console.log(`Pointed position coordinates: (x: ${x.toFixed(0)} px, y: ${y.toFixed(0)} px)`);
+
+        switch (POSITION_SENDING_METHOD) {
+            case "normCoord":
+                return console.log("Pointed position normalized coordinates sent to the LLM");
+
+            case "normCoordAndHotspot":
+                return console.log(`Pointed position normalized coordinates and hotspot ${hotspot} sent to the LLM`);
+
+            case "coord":
+                return console.log("Pointed position pixel coordinates sent to the LLM");
+
+            case "coordAndHotspot":
+                return console.log(`Pointed position pixel coordinates and hotspot ${hotspot} sent to the LLM`);
+
+            case "imgWithPos": {
+                return console.log("Pointed position image sent to the LLM");
+            }
+
+            case "imgWithPosAndHotspot": {
+                return console.log(`Pointed position image and hotspot ${hotspot} sent to the LLM`);
+            }
         }
     }
 
