@@ -57,6 +57,10 @@ interface UIElements {
 export class RealtimeInteraction {
     private static instance: RealtimeInteraction | null = null;
 
+    private data: any | null = null;
+    private template: string | null = null;
+    private colorMap: string | null = null;
+
     private peerConnection: RTCPeerConnection | null = null;
     private audioElement: HTMLAudioElement | null = null;
     private localStream: MediaStream | null = null;
@@ -93,9 +97,11 @@ export class RealtimeInteraction {
         return RealtimeInteraction.instance;
     }
 
-    public init(): void {
+    public async init(): Promise<void> {
         this.initializeUIElements();
         if (!this.elements) return console.error("UI elements not initialized");
+
+        await this.initProjectFiles();
 
         this.elements.startBtn.onclick = () => this.startSession();
         this.elements.stopBtn.onclick = () => this.stopSession();
@@ -121,6 +127,88 @@ export class RealtimeInteraction {
         }
     }
 
+    private async initProjectFiles(): Promise<void> {
+        try {
+            console.log("Preparing project files...");
+
+            const data = await this.getFileData();
+            const template = await this.getFileTemplate();
+            const colorMap = await this.getFileColorMap();
+
+            if (!data) throw new Error("Failed to load data file");
+            if (!template) throw new Error("Failed to load template file");
+            if (!colorMap) throw new Error("Failed to load color map file");
+
+            const sendableTemplate = await this.getSendableImage(template); // base64 string
+            const sendableColorMap = await this.getSendableImage(colorMap); // base64 string
+
+            if (!sendableTemplate) throw new Error("The template image is too large to be sent to LLM");
+            if (!sendableColorMap) throw new Error("The color map image is too large to be sent to LLM");
+
+            this.grayScaleBase64Template = await base64ToGrayScale(sendableTemplate);
+            this.imgDimensions = await getImgDimensions(sendableTemplate);
+
+            this.data = data;
+            this.template = sendableTemplate;
+            this.colorMap = sendableColorMap;
+
+            console.log("Project files prepared");
+
+        } catch (err) {
+            console.error("Failed to prepare project files:", err);
+            this.stopSession();
+        }
+    }
+
+    private async getFileData(): Promise<any> {
+        const path = "/" + CAMIO_FILE_NAME + "/data.json";
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
+        return await response.json();
+    }
+
+    private async getFileTemplate(): Promise<string> {
+        const path = "/" + CAMIO_FILE_NAME + "/template.png";
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
+        const blob = await response.blob();
+        return await imageToBase64(blob);
+    }
+
+    private async getFileColorMap(): Promise<string> {
+        const path = "/" + CAMIO_FILE_NAME + "/colorMap.png";
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
+        const blob = await response.blob();
+        return await imageToBase64(blob);
+    }
+
+    private async getSendableImage(initialBase64Image: string): Promise<string | null> {
+        const maxImageSize: number = 220;
+
+        try {
+            const blob = base64ToBlob(initialBase64Image);
+
+            const reducedDimBlob = await reduceResolution(blob); // reduce dimensions of the blob
+
+            const webpBlob = await toWebp(reducedDimBlob); // convert in webp image
+
+            if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp converted image
+
+            let quality = 0.9;
+            while (quality >= 0.0) {
+                const compressedBlob = await compressWebpBlob(webpBlob, quality);
+                if (checkBlobSize(compressedBlob, maxImageSize)) return await imageToBase64(compressedBlob); // send webp compressed image
+                quality -= 0.1;
+            }
+
+            return null;
+
+        } catch (err) {
+            throw new Error('Image processing failed:' + (err as Error).message);
+        }
+    }
+
     // -----------------
     // SESSION HANDLING
     // -----------------
@@ -129,7 +217,7 @@ export class RealtimeInteraction {
         this.ephemeralKey = await getEphemeralKey();
         if (!this.ephemeralKey) return;
 
-        console.log("Starting session");
+        console.log("Starting realtime session");
 
         if (!this.setupPeerConnection()) return;
         if (!this.setupRemoteAudio()) return;
@@ -167,7 +255,7 @@ export class RealtimeInteraction {
             //this.logStatus("AudioElement", "closed");
         }
 
-        console.log("Session closed");
+        console.log("Realtime session closed");
         this.handleSessionState(false);
         this.handleAudioState(false);
         this.handleRunTestsBtn(false);
@@ -339,15 +427,13 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.onclose = () => {
-            this.stopSession();
             //this.logStatus("DataChannel", "closed");
         }
 
         this.dataChannel.onerror = (e: Event) => {
             if (e instanceof RTCErrorEvent) {
                 console.error("[DataChannel] RTCError:", e.error.message);
-                // fatal error
-                if (e.error.errorDetail === "sctp-failure") this.stopSession();
+                this.stopSession();
             } else {
                 console.error("[DataChannel] Error", e);
             }
@@ -367,7 +453,7 @@ export class RealtimeInteraction {
             switch (msg.type) {
                 // session created
                 case "session.created":
-                    console.log("Session ready");
+                    console.log("Realtime session started");
                     this.handleSessionState(true);
                     if (TEST_MODE) this.handleRunTestsBtn(true);
 
@@ -526,64 +612,26 @@ export class RealtimeInteraction {
         };
 
         this.dataChannel.send(JSON.stringify(config));
-        console.log("Session configuration and system prompt sent to the model");
+        console.log("Session configuration and system prompt sent to the LLM");
     }
 
     // -------------------------
     // SEND .CAMIO FILE CONTENT
     // -------------------------
 
-    private async getFileData(): Promise<any> {
-        const path = "/" + CAMIO_FILE_NAME + "/data.json";
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
-        return await response.json();
-    }
-
-    private async getFileTemplate(): Promise<string> {
-        const path = "/" + CAMIO_FILE_NAME + "/template.png";
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
-        const blob = await response.blob();
-        return await imageToBase64(blob);
-    }
-
-    private async getFileColorMap(): Promise<string> {
-        const path = "/" + CAMIO_FILE_NAME + "/colorMap.png";
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Cannot fetch ${path}`);
-        const blob = await response.blob();
-        return await imageToBase64(blob);
-    }
-
     private async sendFileContent(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
-
-        console.log("Sending project files to the LLM...");
+        if (!this.data || !this.template || !this.colorMap) return this.stopSession();
 
         try {
-            const dataOutput = JSON.stringify(await this.getFileData()); // json string
-            const templateOutput = await this.getFileTemplate(); // base64 string
-            const colorMapOutput = await this.getFileColorMap(); // base64 string
-
-            const sendableTemplate = await this.getSendableImage(templateOutput); // base64 string
-            const sendableColorMap = await this.getSendableImage(colorMapOutput); // base64 string
-
-            if (!sendableTemplate) throw new Error("The template image is too large to be sent to LLM");
-            if (!sendableColorMap) throw new Error("The color map image is too large to be sent to LLM");
-
-            this.grayScaleBase64Template = await base64ToGrayScale(sendableTemplate);
-            this.imgDimensions = await getImgDimensions(sendableTemplate);
-
-            this.sendData(dataOutput);
-            await this.sendImage(sendableTemplate, "template");
-            await this.sendImage(sendableColorMap, "colorMap");
-
-            //console.log(`Image dimensions: ${this.imgDimensions.x}x${this.imgDimensions.y} px`);
-            console.log(`Project files sent to the model`);
+            console.log("Sending project files to the LLM...");
+            this.sendData(JSON.stringify(this.data));
+            this.sendImage(this.template, "template");
+            this.sendImage(this.colorMap, "colorMap");
+            console.log(`Project files sent to the LLM`);
 
         } catch (err) {
-            console.error("Failed to prepare or send file content:", err);
+            console.error("Failed to send camio file content:", err);
             this.stopSession();
         }
     }
@@ -610,36 +658,10 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(res));
-        console.warn("data.json file sent to the model");
+        console.log("data.json file sent to the LLM");
     }
 
-    private async getSendableImage(initialBase64Image: string): Promise<string | null> {
-        const maxImageSize: number = 220;
-
-        try {
-            const blob = base64ToBlob(initialBase64Image);
-
-            const reducedDimBlob = await reduceResolution(blob); // reduce dimensions of the blob
-
-            const webpBlob = await toWebp(reducedDimBlob); // convert in webp image
-
-            if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp converted image
-
-            let quality = 0.9;
-            while (quality >= 0.0) {
-                const compressedBlob = await compressWebpBlob(webpBlob, quality);
-                if (checkBlobSize(compressedBlob, maxImageSize)) return await imageToBase64(compressedBlob); // send webp compressed image
-                quality -= 0.1;
-            }
-
-            return null;
-
-        } catch (err) {
-            throw new Error('Image processing failed:' + (err as Error).message);
-        }
-    }
-
-    private async sendImage(base64Image: string, type: string): Promise<void> {
+    private sendImage(base64Image: string, type: string): void {
         if (!this.dataChannel) return this.stopSession();
 
         let textMsg: string = "";
@@ -668,7 +690,7 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(res));
-        console.warn("Image " + type + " file sent to the the LLM");
+        console.log("Image " + type + " file sent to the the LLM");
     }
 
     // ---------------
@@ -986,7 +1008,7 @@ export class RealtimeInteraction {
             const averageResponseTime = Math.round(
                 this.responseTimes.reduce((sum, val) => sum + val, 0) / this.responseTimes.length
             );
-            console.log(`Average response time: ${averageResponseTime} ms`)
+            console.log(`Average LLM response time: ${averageResponseTime} ms`)
             this.responseTimes = [];
 
             this.questionNumber = -1;
@@ -1034,6 +1056,6 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(res));
-        console.log(`Test question ${this.questionNumber + 1} sent to the model`);
+        console.log(`Test question ${this.questionNumber + 1} sent to the LLM`);
     }
 }
