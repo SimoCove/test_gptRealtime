@@ -21,6 +21,7 @@ export function createSessionConfig(
         voice: "cedar" // or marin
       }
     },
+    truncation: "disabled",
     instructions: `
     # Role
     You are "CamIO Assistant", a real-time AI assistant dedicated to describing and explaining tactile drawings for visually impaired users.

@@ -79,7 +79,6 @@ export class RealtimeInteraction {
     private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private lastImgWithPositionItemId: string | null = null;
-    private lastResponseId: string | null = null;
 
     private questionNumber: number = -1; // for test mode
 
@@ -226,7 +225,6 @@ export class RealtimeInteraction {
         await this.connectToModel();
 
         this.resetLastImgWithPositionItemId();
-        this.resetLastResponseId();
     }
 
     private stopSession(): void {
@@ -267,10 +265,6 @@ export class RealtimeInteraction {
 
     private resetLastImgWithPositionItemId(): void {
         this.lastImgWithPositionItemId = null;
-    }
-
-    private resetLastResponseId(): void {
-        this.lastResponseId = null;
     }
 
     // ------------
@@ -474,9 +468,12 @@ export class RealtimeInteraction {
                     break;
 
                 // handle audio input
+                case "input_audio_buffer.speech_started":
+                    await this.sendPointedPosition();
+                    break;
+                
                 case "input_audio_buffer.committed":
                     console.log("Audio request sent to the LLM");
-                    await this.sendPointedPosition();
                     this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
                     this.startResponseTimer();
                     break;
@@ -520,8 +517,6 @@ export class RealtimeInteraction {
 
                 // response done
                 case "response.done":
-                    this.lastResponseId = msg.response?.output?.[0].id;
-
                     if (msg.response?.status === "failed") {
                         const error = msg.response.status_details?.error;
                         if (error) this.logStatus("DataChannel", "error", error.message);
@@ -624,11 +619,9 @@ export class RealtimeInteraction {
         if (!this.data || !this.template || !this.colorMap) return this.stopSession();
 
         try {
-            console.log("Sending project files to the LLM...");
             this.sendData(JSON.stringify(this.data));
             this.sendImage(this.template, "template");
             this.sendImage(this.colorMap, "colorMap");
-            console.log(`Project files sent to the LLM`);
 
         } catch (err) {
             console.error("Failed to send camio file content:", err);
@@ -849,8 +842,7 @@ export class RealtimeInteraction {
                     type: "message",
                     role: "user",
                     content: contentRes
-                },
-                ...(this.lastResponseId && { previous_item_id: this.lastResponseId })
+                }
             };
 
             this.dataChannel.send(JSON.stringify(res));
