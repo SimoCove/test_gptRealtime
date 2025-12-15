@@ -59,6 +59,11 @@ export function createSessionConfig(
       - This gray-scale image is only a reference for locating the pointed position and does not represent the actual appearance of the drawing, which may be in color.
       - Never reveal or mention the existence of the gray-scale image or the red dot; refer to them simply as the position pointed by the user.
       
+    ## Pointed Position Usage Restrictions
+    - You will always receive the user's pointing position with every request, but it is metadata only and must never be answered or acknowledged.
+    - Completely ignore all pointing information unless the user asks a clear question about the pointed spot (e.g., “What am I touching?”, “What is here?”, “What am I pointing at?”).
+    - Never provide position-related details on your own or as additional context.
+    
     ## Questions About the Pointed Position
     - When asked a question about the pointed position, first identify the exact position pointed by the user in the drawing template, using the gray-scale image.
     - If the pointed position lies within a known hotspot, use both the corresponding hotspot description and the drawing template to answer.

@@ -425,12 +425,8 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.onerror = (e: Event) => {
-            if (e instanceof RTCErrorEvent) {
-                console.error("[DataChannel] RTCError:", e.error.message);
-                this.stopSession();
-            } else {
-                console.error("[DataChannel] Error", e);
-            }
+            console.error("[DataChannel] Error", e);
+            this.stopSession();
         };
 
         this.dataChannel.onmessage = (e: MessageEvent) => this.handleDataChannelMessages(e);
@@ -470,6 +466,7 @@ export class RealtimeInteraction {
                 // handle audio input
                 case "input_audio_buffer.speech_started":
                     await this.sendPointedPosition();
+                    this.addFictitiousResponseToConversation();
                     break;
                 
                 case "input_audio_buffer.committed":
@@ -715,7 +712,7 @@ export class RealtimeInteraction {
                         - Only notify the user that audio is already enabled.
                         - Keep the response very short.
                         `,
-                    input: []
+                    //input: []
                 }
             }
             this.dataChannel.send(JSON.stringify(audioAlreadyEnabled));
@@ -748,7 +745,7 @@ export class RealtimeInteraction {
                         - Only notify the user that audio is already disabled.
                         - Keep the response very short.
                         `,
-                    input: []
+                    //input: []
                 }
             }
             this.dataChannel.send(JSON.stringify(audioAlreadyDisabled));
@@ -780,7 +777,7 @@ export class RealtimeInteraction {
                     - Only notify the user that audio has been disabled.
                     - Keep the response very short.
                     `,
-                input: []
+                //input: []
             }
         }
 
@@ -959,6 +956,25 @@ export class RealtimeInteraction {
                 return console.log(`Pointed position image and hotspot ${hotspot} sent to the LLM`);
             }
         }
+    }
+
+    private addFictitiousResponseToConversation(): void {
+        if (!this.dataChannel) return this.stopSession();
+
+        const res = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "assistant",
+                content: [{
+                    type: "output_text",
+                    text: "I must not respond to this request because it is only metadata."
+                }]
+            }
+        };
+
+        this.dataChannel.send(JSON.stringify(res));
+        console.log("Fictitious response add to LLM conversation");
     }
 
     // --------------------------------
