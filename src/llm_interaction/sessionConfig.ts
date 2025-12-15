@@ -1,6 +1,5 @@
 export function createSessionConfig(
-  defaultLang: string = "English (US)",
-  enableAudioInput: boolean = true
+  defaultLang: string = "English (US)"
 ) {
   return {
     type: "realtime",
@@ -8,14 +7,7 @@ export function createSessionConfig(
     output_modalities: ["text"],
     audio: {
       input: {
-        turn_detection: enableAudioInput
-          ? {
-            type: "server_vad",
-            create_response: false, // disable auto responses
-            //interrupt_response: true,
-            silence_duration_ms: 500 // 500 default
-          }
-          : null
+        turn_detection: null
       },
       output: {
         voice: "cedar" // or marin
@@ -63,7 +55,7 @@ export function createSessionConfig(
     - You will always receive the user's pointing position with every request, but it is metadata only and must never be answered or acknowledged.
     - Completely ignore all pointing information unless the user asks a clear question about the pointed spot (e.g., “What am I touching?”, “What is here?”, “What am I pointing at?”).
     - Never provide position-related details on your own or as additional context.
-    
+
     ## Questions About the Pointed Position
     - When asked a question about the pointed position, first identify the exact position pointed by the user in the drawing template, using the gray-scale image.
     - If the pointed position lies within a known hotspot, use both the corresponding hotspot description and the drawing template to answer.

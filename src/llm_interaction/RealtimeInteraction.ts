@@ -449,6 +449,7 @@ export class RealtimeInteraction {
 
                     this.initSession();
                     this.sendFileContent();
+                    if(!TEST_MODE) this.enableTurnDetection();
                     break;
 
                 // errors
@@ -468,7 +469,7 @@ export class RealtimeInteraction {
                     await this.sendPointedPosition();
                     this.addFictitiousResponseToConversation();
                     break;
-                
+
                 case "input_audio_buffer.committed":
                     console.log("Audio request sent to the LLM");
                     this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
@@ -580,9 +581,9 @@ export class RealtimeInteraction {
         }
     }
 
-    // --------------------
-    // SEND INITIAL PROMPT
-    // --------------------
+    // ----------------------
+    // SEND INITIAL MESSAGES
+    // ----------------------
 
     private async initSession(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
@@ -600,16 +601,12 @@ export class RealtimeInteraction {
 
         const config = {
             type: "session.update",
-            session: createSessionConfig(lang, !TEST_MODE)
+            session: createSessionConfig(lang)
         };
 
         this.dataChannel.send(JSON.stringify(config));
         console.log("Session configuration and system prompt sent to the LLM");
     }
-
-    // -------------------------
-    // SEND .CAMIO FILE CONTENT
-    // -------------------------
 
     private async sendFileContent(): Promise<void> {
         if (!this.dataChannel) return this.stopSession();
@@ -681,6 +678,30 @@ export class RealtimeInteraction {
 
         this.dataChannel.send(JSON.stringify(res));
         console.log("Image " + type + " file sent to the the LLM");
+    }
+
+    private enableTurnDetection(): void {
+        if (!this.dataChannel) return this.stopSession();
+
+        const enableTurnDetectionOutput = {
+            type: "session.update",
+            session: {
+                type: "realtime",
+                audio: {
+                    input: {
+                        turn_detection: { // enable auto audio detection
+                            type: "server_vad",
+                            create_response: false, // disable auto responses
+                            interrupt_response: true,
+                            silence_duration_ms: 500 // 500 default
+                        }
+                    }
+                }
+            }
+        }
+
+        this.dataChannel.send(JSON.stringify(enableTurnDetectionOutput));
+        console.log("LLM audio detection enabled");
     }
 
     // ---------------
