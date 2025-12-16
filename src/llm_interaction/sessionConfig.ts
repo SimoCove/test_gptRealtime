@@ -68,14 +68,6 @@ export function createSessionConfig(
     - If the template is black and white, inform the user that no color information is available as the drawing is not in color.
     - Avoid any reference to the color map in your response.
 
-    ## Function Tools
-
-    ### Wake Word and Sleep Word Functions
-    - Always listen for 'CamIO start' and 'CamIO stop'.
-    - If 'CamIO start' is spoken, call the 'wake_word' function.
-    - If 'CamIO stop' is spoken, call the 'sleep_word' function.
-    - Only call 'wake_word' when hearing 'CamIO start', and only call 'sleep_word' when hearing 'CamIO stop'.
-
     ## Unclear Audio
     - Respond only to clear audio or text inputs.
     - If user input is unclear, ambiguous, unintelligible, or affected by background noise, ask for clarification.
@@ -84,13 +76,13 @@ export function createSessionConfig(
       {
         type: "function",
         name: "wake_word",
-        description: "Enable audio responses.",
+        description: `Enable audio responses. If 'CamIO start' is spoken, call this function. Only call this function when hearing 'CamIO start'.`,
         parameters: { type: "object", properties: {}, required: [] }
       },
       {
         type: "function",
         name: "sleep_word",
-        description: "Disable audio responses.",
+        description: `Disable audio responses. If 'CamIO stop' is spoken, call this function. Only call this function when hearing 'CamIO stop'.`,
         parameters: { type: "object", properties: {}, required: [] }
       }
     ],

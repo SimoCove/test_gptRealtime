@@ -446,7 +446,6 @@ export class RealtimeInteraction {
                     console.log("Realtime session started");
                     this.handleSessionState(true);
                     if (TEST_MODE) this.handleRunTestsBtn(true);
-
                     this.initSession();
                     this.sendFileContent();
                     if(!TEST_MODE) this.enableTurnDetection();
@@ -704,9 +703,9 @@ export class RealtimeInteraction {
         console.log("LLM audio detection enabled");
     }
 
-    // ---------------
-    // FUNCTION CALLS
-    // ---------------
+    // ------------------------
+    // FUNCTION CALLS HANDLING
+    // ------------------------
 
     private handleFunctionCalls(msg: RealtimeMessage): void {
         switch (msg.name) {
