@@ -1,3 +1,5 @@
+export const INPUT_TOKEN_LIMIT = 28672; // default 28672
+
 export function createSessionConfig(
   defaultLang: string = "English (US)"
 ) {
@@ -13,7 +15,7 @@ export function createSessionConfig(
         voice: "cedar" // or marin
       }
     },
-    truncation: "disabled",
+    truncation: "auto", // or disabled
     instructions: `
     # Role
     You are "CamIO Assistant", a real-time AI assistant dedicated to describing and explaining tactile drawings for visually impaired users.

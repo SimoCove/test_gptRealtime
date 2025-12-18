@@ -6,7 +6,7 @@ import {
 } from "../inputSettings";
 
 import { getEphemeralKey } from "../ephemeralKey/getEphemeralKey";
-import { createSessionConfig } from "./sessionConfig";
+import { INPUT_TOKEN_LIMIT, createSessionConfig } from "./sessionConfig";
 import { BenchmarkQuestion } from "../testModeQuestions/benchmarkQuestions";
 
 import {
@@ -79,6 +79,8 @@ export class RealtimeInteraction {
     private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private lastImgWithPositionItemId: string | null = null;
+
+    private conversationItems: string[] = [];
 
     private questionNumber: number = -1; // for test mode
 
@@ -448,22 +450,16 @@ export class RealtimeInteraction {
                     if (TEST_MODE) this.handleRunTestsBtn(true);
                     this.initSession();
                     this.sendFileContent();
-                    if(!TEST_MODE) this.enableTurnDetection();
+                    if (!TEST_MODE) this.enableTurnDetection();
                     break;
 
-                // errors
-                case "invalid_request_error":
-                    if (msg.error) this.logStatus("DataChannel", "error", msg.error);
-                    this.stopSession();
-                    break;
-
+                // error
                 case "error":
                     const errorMsg = msg.error?.message;
                     if (errorMsg) this.logStatus("DataChannel", "error", errorMsg);
-                    if (msg.error.code != "conversation_already_has_active_response") this.stopSession();
                     break;
 
-                // handle audio input
+                // audio input
                 case "input_audio_buffer.speech_started":
                     await this.sendPointedPosition();
                     this.addFictitiousResponseToConversation();
@@ -475,7 +471,11 @@ export class RealtimeInteraction {
                     this.startResponseTimer();
                     break;
 
-                // handle conversation items
+                // conversation items
+                case "conversation.item.added":
+                    this.addItemToConversationItemList(msg.item.id);
+                    break;
+                
                 case "conversation.item.done":
                     const item = msg.item;
                     // get item_id of image with position message
@@ -493,6 +493,7 @@ export class RealtimeInteraction {
                     if (this.elements) this.elements.modelResponse.textContent = "";
                     break;
 
+                // response delta
                 case "response.output_text.delta":
                     this.printResponseTime();
                     if (msg.delta && this.elements) this.elements.modelResponse.textContent += msg.delta;
@@ -518,9 +519,11 @@ export class RealtimeInteraction {
                         const error = msg.response.status_details?.error;
                         if (error) this.logStatus("DataChannel", "error", error.message);
                         this.stopSession();
+                    } else {
+                        this.printTokenUsage(msg);
+                        this.deletePartOfConversationIfNecessary(msg);
+                        if (msg.response?.output?.[0]?.type === "message" && TEST_MODE) await this.sendTestMessage();
                     }
-
-                    if (msg.response?.output?.[0]?.type === "message" && TEST_MODE) await this.sendTestMessage();
                     break;
 
                 // function calls
@@ -1007,14 +1010,8 @@ export class RealtimeInteraction {
 
     private deleteLastImgWithPosition(): void {
         const itemId = this.lastImgWithPositionItemId;
-        if (!itemId) return;
 
-        const deleteItem = {
-            type: "conversation.item.delete",
-            item_id: itemId
-        };
-
-        this.dataChannel!.send(JSON.stringify(deleteItem));
+        this.deleteItemFromConversation(itemId);
     }
 
     // ----------
@@ -1046,6 +1043,7 @@ export class RealtimeInteraction {
 
         this.setTestCoordsAndHotspot(question);
         await this.sendPointedPosition();
+        this.addFictitiousResponseToConversation();
         await this.sendTestQuestion(question);
         this.dataChannel.send(JSON.stringify({ type: "response.create" }));
         this.startResponseTimer();
@@ -1085,5 +1083,65 @@ export class RealtimeInteraction {
 
         this.dataChannel.send(JSON.stringify(res));
         console.log(`Test question ${this.questionNumber + 1} sent to the LLM`);
+    }
+
+    // ------------
+    // TOKEN USAGE
+    // ------------
+
+    private printTokenUsage(msg: any): void {
+        const usage = msg.response?.usage;
+        if (!usage) return;
+
+        console.log("LLM token usage:", usage);
+    }
+
+    // ---------------------------
+    // CONVERSATION ITEM HANDLING
+    // ---------------------------
+
+    private addItemToConversationItemList(itemId: string): void {
+        if (!itemId) return;
+        this.conversationItems.push(itemId);
+    }
+
+    private deleteItemFromConversation(itemId: string | null): void {
+        if (!this.dataChannel) return this.stopSession();
+        if (!itemId) return;
+
+        const index = this.conversationItems.indexOf(itemId);
+        if (index == -1) return;
+
+        const deleteItem = {
+            type: "conversation.item.delete",
+            item_id: itemId
+        };
+
+        this.conversationItems.splice(index, 1);
+        this.dataChannel.send(JSON.stringify(deleteItem));
+    }
+
+    private deletePartOfConversationIfNecessary(msg: any): void {
+        const inputTokens = msg.response?.usage?.input_tokens;
+        if (!inputTokens) return;
+
+        // when the context contains at least 80% of the limit token count, the first 30% of messages are dropped from the conversation (not data, template, and color map)
+        // 80% and 30% are editable values
+        const itemRemovalRate = 0.3;
+        const conversationLimitRate = 0.8;
+
+        if (inputTokens >= INPUT_TOKEN_LIMIT * conversationLimitRate) {
+            const startIndex = 3;
+            if (this.conversationItems.length > startIndex) {
+                const removableCount = Math.floor(this.conversationItems.length * itemRemovalRate);
+
+                for (let i = 0; i < removableCount; i++) {
+                    const itemId = this.conversationItems[startIndex];
+                    this.deleteItemFromConversation(itemId);
+                }
+
+                console.log(`Deleted ${removableCount} items from conversation context`);
+            }
+        }
     }
 }
