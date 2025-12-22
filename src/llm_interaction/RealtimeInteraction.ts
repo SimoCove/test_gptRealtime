@@ -69,7 +69,7 @@ export class RealtimeInteraction {
     private ephemeralKey: string | null = null;
     private elements: UIElements | null = null;
 
-    private audioResponsesOn: boolean = false;
+    private responsesOn: boolean = false;
 
     private requestStartTime: number | null = null;
     private responseStarted: boolean = false;
@@ -79,7 +79,6 @@ export class RealtimeInteraction {
     private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private lastImgWithPositionItemId: string | null = null;
-
     private conversationItems: string[] = [];
 
     private questionNumber: number = -1; // for test mode
@@ -298,11 +297,11 @@ export class RealtimeInteraction {
         if (!this.elements) return console.error("UI elements not initialized");
 
         if (state) {
-            this.audioResponsesOn = true;
+            this.responsesOn = true;
             this.elements.audioState.textContent = "Audio on";
 
         } else {
-            this.audioResponsesOn = false;
+            this.responsesOn = false;
             this.elements.audioState.textContent = "Audio off";
         }
     }
@@ -726,7 +725,7 @@ export class RealtimeInteraction {
         console.warn("Called function enableAudio()");
         if (!this.dataChannel) return this.stopSession();
 
-        if (this.audioResponsesOn) { // audio already enabled
+        if (this.responsesOn) { // audio already enabled
             const audioAlreadyEnabled = {
                 type: "response.create",
                 response: {
@@ -759,7 +758,7 @@ export class RealtimeInteraction {
         console.warn("Called function disableAudio()");
         if (!this.dataChannel) return this.stopSession();
 
-        if (!this.audioResponsesOn) { // audio already disabled
+        if (!this.responsesOn) { // audio already disabled
             const audioAlreadyDisabled = {
                 type: "response.create",
                 response: {
