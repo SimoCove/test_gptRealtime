@@ -1,4 +1,5 @@
 export const INPUT_TOKEN_LIMIT = 28672; // default 28672
+export const RESPONSE_TOKEN_LIMIT = 4096; // default 4096
 
 export function createSessionConfig(
   defaultLang: string = "English (US)"
@@ -9,13 +10,13 @@ export function createSessionConfig(
     output_modalities: ["text"],
     audio: {
       input: {
-        turn_detection: null
+        turn_detection: null // disable auto audio detection
       },
       output: {
         voice: "cedar" // or marin
       }
     },
-    truncation: "auto", // or disabled
+    truncation: "disabled", // or auto
     instructions: `
     # Role
     You are "CamIO Assistant", a real-time AI assistant dedicated to describing and explaining tactile drawings for visually impaired users.
@@ -85,6 +86,12 @@ export function createSessionConfig(
         type: "function",
         name: "sleep_word",
         description: `Disable audio responses. If 'CamIO stop' is spoken, call this function. Only call this function when hearing 'CamIO stop'.`,
+        parameters: { type: "object", properties: {}, required: [] }
+      },
+      {
+        type: "function",
+        name: "interrupt_response",
+        description: `Interrupt the response in progress. If 'Interrupt response' is spoken, call this function. Only call this function when hearing 'Interrupt response'. Do not confuse with "CamIO stop".`,
         parameters: { type: "object", properties: {}, required: [] }
       }
     ],

@@ -128,19 +128,6 @@ export function compressWebpBlob(blob: Blob, quality: number = 0.8): Promise<Blo
     });
 }
 
-export function mapLangCodeToName(langCode: string): string {
-  const map: Record<string, string> = {
-    "en-US": "English (US)",
-    "en-GB": "English (UK)",
-    "en-AU": "English (Australia)",
-    "it-IT": "Italian",
-    "fr-FR": "French",
-    "es-ES": "Spanish"
-  };
-
-  return map[langCode] || "English (US)";
-}
-
 export async function drawPointedPosition(base64Img: string, x: number | null, y: number | null, radius: number = 9): Promise<string> {
     if (x === null || y === null) return base64Img;
 
@@ -219,4 +206,17 @@ export async function base64ToGrayScale(base64Img: string): Promise<string> {
 
         img.onerror = (e) => reject(e);
     });
+}
+
+export function mapLangCodeToName(langCode: string): string {
+  const map: Record<string, string> = {
+    "en-US": "English (US)",
+    "en-GB": "English (UK)",
+    "en-AU": "English (Australia)",
+    "it-IT": "Italian",
+    "fr-FR": "French",
+    "es-ES": "Spanish"
+  };
+
+  return map[langCode] || "English (US)";
 }

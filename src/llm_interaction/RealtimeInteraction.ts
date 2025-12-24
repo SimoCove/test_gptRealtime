@@ -6,7 +6,11 @@ import {
 } from "../inputSettings";
 
 import { getEphemeralKey } from "../ephemeralKey/getEphemeralKey";
-import { INPUT_TOKEN_LIMIT, createSessionConfig } from "./sessionConfig";
+import {
+    INPUT_TOKEN_LIMIT,
+    RESPONSE_TOKEN_LIMIT,
+    createSessionConfig
+} from "./sessionConfig";
 import { BenchmarkQuestion } from "../testModeQuestions/benchmarkQuestions";
 
 import {
@@ -18,9 +22,9 @@ import {
     reduceResolution,
     getImgDimensions,
     compressWebpBlob,
-    mapLangCodeToName,
     drawPointedPosition,
-    base64ToGrayScale
+    base64ToGrayScale,
+    mapLangCodeToName,
 } from '../utils/utils';
 
 type RealtimeMessage = {
@@ -60,6 +64,8 @@ export class RealtimeInteraction {
     private data: any | null = null;
     private template: string | null = null;
     private colorMap: string | null = null;
+    private grayScaleBase64Template: string | null = null;
+    private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private peerConnection: RTCPeerConnection | null = null;
     private audioElement: HTMLAudioElement | null = null;
@@ -67,16 +73,15 @@ export class RealtimeInteraction {
     private dataChannel: RTCDataChannel | null = null;
 
     private ephemeralKey: string | null = null;
+
     private elements: UIElements | null = null;
 
+    private sessionOn: boolean = false;
     private responsesOn: boolean = false;
 
     private requestStartTime: number | null = null;
     private responseStarted: boolean = false;
     private responseTimes: number[] = [];
-
-    private grayScaleBase64Template: string | null = null;
-    private imgDimensions: { x: number; y: number } = { x: -1, y: -1 }; // -1 are only placeholders
 
     private lastImgWithPositionItemId: string | null = null;
     private conversationItems: string[] = [];
@@ -188,9 +193,7 @@ export class RealtimeInteraction {
 
         try {
             const blob = base64ToBlob(initialBase64Image);
-
             const reducedDimBlob = await reduceResolution(blob); // reduce dimensions of the blob
-
             const webpBlob = await toWebp(reducedDimBlob); // convert in webp image
 
             if (checkBlobSize(webpBlob, maxImageSize)) return await imageToBase64(webpBlob); // send webp converted image
@@ -226,6 +229,9 @@ export class RealtimeInteraction {
         await this.connectToModel();
 
         this.resetLastImgWithPositionItemId();
+        this.handleResponseState(false);
+        this.handleAudioState(false);
+        this.handleRunTestsBtn(false);
     }
 
     private stopSession(): void {
@@ -260,17 +266,9 @@ export class RealtimeInteraction {
         this.handleRunTestsBtn(false);
     }
 
-    // -------
-    // RESETS 
-    // -------
-
-    private resetLastImgWithPositionItemId(): void {
-        this.lastImgWithPositionItemId = null;
-    }
-
-    // ------------
-    // UI HANDLING
-    // ------------
+    // ---------------
+    // STATE HANDLING
+    // ---------------
 
     private handleSessionState(state: boolean): void {
         if (!this.elements) return console.error("UI elements not initialized");
@@ -291,6 +289,16 @@ export class RealtimeInteraction {
             this.elements.startBtn.disabled = false;
             this.elements.stopBtn.disabled = true;
         }
+
+        this.sessionOn = state;
+    }
+
+    private handleResponseState(state: boolean): void {
+        this.responsesOn = state;
+    }
+
+    private resetLastImgWithPositionItemId(): void {
+        this.lastImgWithPositionItemId = null;
     }
 
     private handleAudioState(state: boolean): void {
@@ -332,6 +340,14 @@ export class RealtimeInteraction {
             const err = prefix + ' Error ' + (detail ?? "");
             console.error(err);
         }
+    }
+
+    private logErrorMessage(errorMsg: string): void {
+        if (errorMsg) console.error("Error: ", errorMsg);
+    }
+
+    private logResponse(response: string): void {
+        console.log("LLM response: " + response);
     }
 
     // -----------------
@@ -447,15 +463,14 @@ export class RealtimeInteraction {
                     console.log("Realtime session started");
                     this.handleSessionState(true);
                     if (TEST_MODE) this.handleRunTestsBtn(true);
-                    this.initSession();
+                    await this.initSession();
                     this.sendFileContent();
                     if (!TEST_MODE) this.enableTurnDetection();
                     break;
 
                 // error
                 case "error":
-                    const errorMsg = msg.error?.message;
-                    if (errorMsg) this.logStatus("DataChannel", "error", errorMsg);
+                    this.logErrorMessage(msg.error?.message);
                     break;
 
                 // audio input
@@ -466,7 +481,7 @@ export class RealtimeInteraction {
 
                 case "input_audio_buffer.committed":
                     console.log("Audio request sent to the LLM");
-                    this.dataChannel!.send(JSON.stringify({ type: "response.create" }));
+                    this.generateResponse();
                     this.startResponseTimer();
                     break;
 
@@ -474,55 +489,40 @@ export class RealtimeInteraction {
                 case "conversation.item.added":
                     this.addItemToConversationItemList(msg.item.id);
                     break;
-                
+
                 case "conversation.item.done":
-                    const item = msg.item;
-                    // get item_id of image with position message
-                    // note: this is not a robust method to extract pointed position image messages, but it is the simplest one
-                    if (item.type == "message" &&
-                        item.content?.[0]?.type === "input_text" &&
-                        item.content?.[0]?.text === "The user is pointing at the position represented in this image:" &&
-                        item.content?.[1]?.type === "input_image") {
-                        this.setLastImgWithPositionItemID(item.id);
-                    }
+                    this.setLastImgWithPositionItemIdIfNecessary(msg.item);
                     break;
 
                 // transcription of the text response in the UI
                 case "response.content_part.added":
-                    if (this.elements) this.elements.modelResponse.textContent = "";
+                    if (this.elements && this.responsesOn) this.elements.modelResponse.textContent = "";
                     break;
 
                 // response delta
                 case "response.output_text.delta":
                     this.printResponseTime();
-                    if (msg.delta && this.elements) this.elements.modelResponse.textContent += msg.delta;
+                    if (msg.delta && this.elements && this.responsesOn) this.elements.modelResponse.textContent += msg.delta;
                     break;
 
                 case "response.output_audio_transcript.delta":
                     this.printResponseTime();
-                    if (msg.delta && this.elements) this.elements.modelResponse.textContent += msg.delta;
+                    if (msg.delta && this.elements && this.responsesOn) this.elements.modelResponse.textContent += msg.delta;
                     break;
 
                 // transcription of the text response in console
                 case "response.output_text.done":
-                    console.log("LLM response: " + msg.text);
+                    this.logResponse(msg.text);
                     break;
 
                 case "response.output_audio_transcript.done":
-                    console.log("LLM response: " + msg.transcript);
+                    this.logResponse(msg.transcript);
                     break;
 
                 // response done
                 case "response.done":
-                    if (msg.response?.status === "failed") {
-                        const error = msg.response.status_details?.error;
-                        if (error) this.logStatus("DataChannel", "error", error.message);
-                        this.stopSession();
-                    } else {
-                        this.printTokenUsage(msg);
-                        this.deletePartOfConversationIfNecessary(msg);
-                        if (msg.response?.output?.[0]?.type === "message" && TEST_MODE) await this.sendTestMessage();
-                    }
+                    this.printTokenUsage(msg);
+                    this.handleResponseDone(msg);
                     break;
 
                 // function calls
@@ -535,9 +535,9 @@ export class RealtimeInteraction {
 
         } catch (err) {
             if (err instanceof Error) {
-                this.logStatus("DataChannel", "error", err.message);
+                console.error("Error", err.message);
             } else {
-                this.logStatus("DataChannel", "error", String(err));
+                console.error("Error", String(err));
             }
             this.stopSession();
         }
@@ -705,6 +705,38 @@ export class RealtimeInteraction {
         console.log("LLM audio detection enabled");
     }
 
+    // ------------------
+    // GENERATE RESPONSE
+    // ------------------
+
+    private generateResponse(): void {
+        if (!this.dataChannel) return this.stopSession();
+        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
+    }
+
+    // -----------------------
+    // RESPONSE DONE HANDLING
+    // -----------------------
+
+    private async handleResponseDone(msg: RealtimeMessage): Promise<void> {
+        const response = msg.response;
+        if (!response) return;
+
+        const status = response.status;
+        const output = response.output;
+        if (!status || !output) return;
+
+        if (status === "failed") {
+            this.logErrorMessage(msg.response.status_details?.error?.message);
+            this.stopSession();
+            return;
+        }
+
+        this.deletePartOfConversationIfNecessary(msg);
+
+        if (output[0]?.type === "message" && TEST_MODE) await this.sendTestMessage();
+    }
+
     // ------------------------
     // FUNCTION CALLS HANDLING
     // ------------------------
@@ -717,6 +749,10 @@ export class RealtimeInteraction {
 
             case "sleep_word":
                 this.disableAudio();
+                break;
+            
+            case "interrupt_response":
+                this.interruptResponse();
                 break;
         }
     }
@@ -737,6 +773,7 @@ export class RealtimeInteraction {
                     //input: []
                 }
             }
+            console.log("Responses already enabled");
             this.dataChannel.send(JSON.stringify(audioAlreadyEnabled));
             return;
         }
@@ -750,8 +787,10 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(enableAudioOutput));
+        this.handleResponseState(true);
         this.handleAudioState(true);
-        this.dataChannel.send(JSON.stringify({ type: "response.create" }));
+        console.log("Responses enabled");
+        this.generateResponse();
     }
 
     private async disableAudio(): Promise<void> {
@@ -770,6 +809,7 @@ export class RealtimeInteraction {
                     //input: []
                 }
             }
+            console.log("Responses already disabled");
             this.dataChannel.send(JSON.stringify(audioAlreadyDisabled));
             return;
         }
@@ -783,7 +823,10 @@ export class RealtimeInteraction {
         }
 
         this.dataChannel.send(JSON.stringify(disableAudioOutput));
+        this.handleResponseState(false);
         this.handleAudioState(false);
+        if (this.elements) this.elements.modelResponse.textContent = "The model response will appear here...";
+        console.log("Responses disabled");
         this.feedbackAudioDisabled();
     }
 
@@ -806,22 +849,13 @@ export class RealtimeInteraction {
         this.dataChannel.send(JSON.stringify(audioDisFeedback));
     }
 
-    // --------------
-    // RESPONSE TIME
-    // --------------
+    // -------------------------------
+    // INTERRUPT RESPONSE IN PROGRESS
+    // -------------------------------
 
-    private startResponseTimer(): void {
-        this.requestStartTime = performance.now();
-        this.responseStarted = false;
-    }
-
-    private printResponseTime(): void {
-        if (!this.responseStarted && this.requestStartTime != null) {
-            const latency = Math.round(performance.now() - this.requestStartTime);
-            console.log(`LLM response time: ${latency} ms`);
-            if (TEST_MODE) this.responseTimes.push(latency);
-            this.responseStarted = true;
-        }
+    private interruptResponse(): void {
+        console.warn("Called function interruptResponse()");
+        console.log("Response in progress interrupted");
     }
 
     // -----------------
@@ -880,7 +914,11 @@ export class RealtimeInteraction {
         return { normX, normY };
     }
 
-    private async buildPointedPositionMessage(x: number | null, y: number | null, hotspot: string | null): Promise<PositionMessageContent | null> {
+    private async buildPointedPositionMessage(
+        x: number | null,
+        y: number | null,
+        hotspot: string | null
+    ): Promise<PositionMessageContent | null> {
         if (POSITION_SENDING_METHOD == null) return null;
 
         if (x === null || y === null) {
@@ -1003,14 +1041,92 @@ export class RealtimeInteraction {
     // PREVIOUS POINTED POSITION IMAGE
     // --------------------------------
 
-    private setLastImgWithPositionItemID(itemId: string): void {
-        this.lastImgWithPositionItemId = itemId;
+    private setLastImgWithPositionItemIdIfNecessary(item: any): void {
+        // note: this is not a robust method to extract pointed position image messages, but it is the simplest one
+        if (item.type == "message" &&
+            item.content?.[0]?.type === "input_text" &&
+            item.content?.[0]?.text === "The user is pointing at the position represented in this image:" &&
+            item.content?.[1]?.type === "input_image") {
+
+            this.lastImgWithPositionItemId = item.id;
+        }
     }
 
     private deleteLastImgWithPosition(): void {
         const itemId = this.lastImgWithPositionItemId;
-
         this.deleteItemFromConversation(itemId);
+    }
+
+    // ----------------------------
+    // RESPONSE TIME E TOKEN USAGE
+    // ----------------------------
+
+    private startResponseTimer(): void {
+        this.requestStartTime = performance.now();
+        this.responseStarted = false;
+    }
+
+    private printResponseTime(): void {
+        if (!this.responseStarted && this.requestStartTime != null) {
+            const latency = Math.round(performance.now() - this.requestStartTime);
+            console.log(`LLM response time: ${latency} ms`);
+            if (TEST_MODE) this.responseTimes.push(latency);
+            this.responseStarted = true;
+        }
+    }
+
+    private printTokenUsage(msg: any): void {
+        const usage = msg.response?.usage;
+        if (!usage) return;
+        console.log("LLM token usage:", usage);
+    }
+
+    // ----------------------------------------
+    // CONVERSATION ITEM HANDLING (TRUNCATION)
+    // ----------------------------------------
+
+    private addItemToConversationItemList(itemId: string): void {
+        if (!itemId) return;
+        this.conversationItems.push(itemId);
+    }
+
+    private deleteItemFromConversation(itemId: string | null): void {
+        if (!this.dataChannel) return this.stopSession();
+        if (!itemId) return;
+
+        const index = this.conversationItems.indexOf(itemId);
+        if (index == -1) return;
+
+        const deleteItem = {
+            type: "conversation.item.delete",
+            item_id: itemId
+        };
+
+        this.conversationItems.splice(index, 1);
+        this.dataChannel.send(JSON.stringify(deleteItem));
+    }
+
+    private deletePartOfConversationIfNecessary(msg: any): void {
+        const inputTokens = msg.response?.usage?.input_tokens;
+        if (!inputTokens) return;
+
+        const cuttingLimit = 10000;
+        const itemRemovalRate = 0.1;
+
+        if (inputTokens >= cuttingLimit) {
+            const startIndex = 3;
+
+            if (this.conversationItems.length > startIndex) {
+                const removableItemsCount = Math.floor(this.conversationItems.length * itemRemovalRate);
+
+                for (let i = 0; i < removableItemsCount; i++) {
+                    const itemId = this.conversationItems[startIndex];
+                    this.deleteItemFromConversation(itemId);
+                }
+
+                console.log(`Deleted ${removableItemsCount} items from conversation context`);
+            }
+        }
     }
 
     // ----------
@@ -1082,65 +1198,5 @@ export class RealtimeInteraction {
 
         this.dataChannel.send(JSON.stringify(res));
         console.log(`Test question ${this.questionNumber + 1} sent to the LLM`);
-    }
-
-    // ------------
-    // TOKEN USAGE
-    // ------------
-
-    private printTokenUsage(msg: any): void {
-        const usage = msg.response?.usage;
-        if (!usage) return;
-
-        console.log("LLM token usage:", usage);
-    }
-
-    // ---------------------------
-    // CONVERSATION ITEM HANDLING
-    // ---------------------------
-
-    private addItemToConversationItemList(itemId: string): void {
-        if (!itemId) return;
-        this.conversationItems.push(itemId);
-    }
-
-    private deleteItemFromConversation(itemId: string | null): void {
-        if (!this.dataChannel) return this.stopSession();
-        if (!itemId) return;
-
-        const index = this.conversationItems.indexOf(itemId);
-        if (index == -1) return;
-
-        const deleteItem = {
-            type: "conversation.item.delete",
-            item_id: itemId
-        };
-
-        this.conversationItems.splice(index, 1);
-        this.dataChannel.send(JSON.stringify(deleteItem));
-    }
-
-    private deletePartOfConversationIfNecessary(msg: any): void {
-        const inputTokens = msg.response?.usage?.input_tokens;
-        if (!inputTokens) return;
-
-        // when the context contains at least 80% of the limit token count, the first 30% of messages are dropped from the conversation (not data, template, and color map)
-        // 80% and 30% are editable values
-        const itemRemovalRate = 0.3;
-        const conversationLimitRate = 0.8;
-
-        if (inputTokens >= INPUT_TOKEN_LIMIT * conversationLimitRate) {
-            const startIndex = 3;
-            if (this.conversationItems.length > startIndex) {
-                const removableCount = Math.floor(this.conversationItems.length * itemRemovalRate);
-
-                for (let i = 0; i < removableCount; i++) {
-                    const itemId = this.conversationItems[startIndex];
-                    this.deleteItemFromConversation(itemId);
-                }
-
-                console.log(`Deleted ${removableCount} items from conversation context`);
-            }
-        }
     }
 }
